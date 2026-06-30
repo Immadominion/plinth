@@ -1,0 +1,134 @@
+---
+title: 'Admin (test mode only)'
+description: 'Control the test clock, trigger billing ticks, and manage the suspense queue.'
+---
+
+<Warning>
+Admin endpoints are scoped to test-mode keys only (`sk_test_`). They're not available in production. Calling them with a live key returns `403 Forbidden`.
+</Warning>
+
+---
+
+## GET /admin/clock
+
+Get the current simulated time for your sandbox tenant.
+
+```bash
+curl https://api.useplinth.com/admin/clock \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "simulated_now": "2026-06-01T00:00:00Z",
+  "real_now": "2026-06-18T10:23:44Z",
+  "offset_seconds": 0
+}
+```
+
+---
+
+## POST /admin/clock/advance
+
+Advance the simulated clock by a number of seconds.
+
+```bash
+curl -X POST https://api.useplinth.com/admin/clock/advance \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"seconds": 2592000}'
+```
+
+**Request body**
+
+<ParamField body="seconds" type="number" required>
+  Number of seconds to advance. Must be positive. Max: `31536000` (1 year) per call.
+</ParamField>
+
+```json Response
+{
+  "simulated_now": "2026-07-01T00:00:00Z",
+  "advanced_seconds": 2592000
+}
+```
+
+Advancing the clock alone doesn't trigger billing. Follow with `POST /admin/tick`.
+
+---
+
+## POST /admin/tick
+
+Run the billing engine for your tenant at the current simulated time. This processes subscription renewals, dunning retries, grace expiries, and state transitions.
+
+```bash
+curl -X POST https://api.useplinth.com/admin/tick \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "processed_subscriptions": 3,
+  "invoices_created": 2,
+  "invoices_paid": 1,
+  "state_transitions": [
+    {
+      "subscription_id": "sub_01JABC...",
+      "from": "active",
+      "to": "past_due",
+      "reason": "card_declined"
+    }
+  ],
+  "webhooks_fired": ["subscription.past_due", "invoice.created"]
+}
+```
+
+---
+
+## GET /admin/suspense
+
+List transfers that arrived but couldn't be matched to an open invoice.
+
+```bash
+curl https://api.useplinth.com/admin/suspense \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "items": [
+    {
+      "id": "susp_01JABC...",
+      "customer_id": "cus_01JXYZ...",
+      "amount_minor": 500000,
+      "received_at": "2026-06-05T09:14:00Z",
+      "reason": "no_open_invoice"
+    }
+  ]
+}
+```
+
+---
+
+## POST /admin/suspense/:id/resolve
+
+Manually apply a suspense transfer to a specific invoice, or credit it to the customer's balance.
+
+```bash
+curl -X POST https://api.useplinth.com/admin/suspense/susp_01JABC.../resolve \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "apply_to_invoice",
+    "invoice_id": "inv_01JDEF..."
+  }'
+```
+
+**Request body**
+
+<ParamField body="action" type="string" required>
+  `apply_to_invoice` — apply to a specific invoice. `credit_balance` — add to the customer's balance.
+</ParamField>
+
+<ParamField body="invoice_id" type="string">
+  Required if `action` is `apply_to_invoice`.
+</ParamField>

@@ -1,0 +1,390 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { Topbar } from '@/components/layout/topbar';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Eye, EyeOff, AlertTriangle, CheckCircle, Copy, Check, Plus, Trash2 } from 'lucide-react';
+import { api } from '@/lib/api';
+
+const VERTICAL_TABS = [
+  { id: 'general',  label: 'General' },
+  { id: 'apikeys',  label: 'API Keys' },
+  { id: 'billing',  label: 'Billing Policy' },
+  { id: 'testmode', label: 'Test Mode' },
+];
+
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('general');
+  const [showSecret, setShowSecret] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Current tenant
+  const [tenant, setTenant] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    api.me.get().then((t) => setTenant({ id: t.id, name: t.name })).catch(() => {});
+  }, []);
+
+  // Billing policy state
+  const [upgradeStrategy, setUpgradeStrategy] = useState('immediate_prorated');
+  const [downgradeStrategy, setDowngradeStrategy] = useState('at_period_end');
+  const [dunningChanges, setDunningChanges] = useState('gate_upgrades');
+  const [graceDays, setGraceDays] = useState('7');
+  const [maxDebt, setMaxDebt] = useState('5000');
+  const [maxAttempts, setMaxAttempts] = useState('4');
+  const [paydayDay, setPaydayDay] = useState('25');
+
+  // Clock state
+  const [clockSeconds, setClockSeconds] = useState('');
+  const [tickRunning, setTickRunning] = useState(false);
+
+  // API keys state
+  type ApiKey = { id: string; prefix: string; mode: string; created_at: string; revoked_at: string | null };
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'apikeys') return;
+    setKeysLoading(true);
+    api.keys.list()
+      .then((res: any) => setKeys(res.data ?? []))
+      .catch(() => {})
+      .finally(() => setKeysLoading(false));
+  }, [activeTab]);
+
+  async function createKey() {
+    setCreating(true);
+    try {
+      const res = await api.keys.create('live');
+      setNewKey(res.api_key);
+      setKeys((prev) => [{ id: res.id, prefix: res.prefix, mode: 'live', created_at: new Date().toISOString(), revoked_at: null }, ...prev]);
+    } catch {} finally { setCreating(false); }
+  }
+
+  async function revokeKey(id: string) {
+    if (!confirm('Revoke this key? Any requests using it will stop working immediately.')) return;
+    await api.keys.revoke(id);
+    setKeys((prev) => prev.map((k) => k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k));
+  }
+
+  function copyNewKey() {
+    if (!newKey) return;
+    navigator.clipboard.writeText(newKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleSave() {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function runTick() {
+    setTickRunning(true);
+    await new Promise((r) => setTimeout(r, 1000));
+    setTickRunning(false);
+  }
+
+  return (
+    <div className="flex flex-col">
+      <Topbar title="Settings" />
+
+      <div className="p-6">
+        <div className="flex gap-6">
+          {/* Vertical tabs */}
+          <div className="w-40 shrink-0">
+            <nav className="space-y-0.5">
+              {VERTICAL_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
+                    activeTab === tab.id
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 font-medium'
+                      : 'text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 space-y-4">
+            {activeTab === 'general' && (
+              <>
+                <Card>
+                  <CardHeader><CardTitle>Tenant</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Tenant Name</label>
+                      <Input value={tenant?.name ?? ''} readOnly className="bg-gray-50 dark:bg-slate-800" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Tenant ID</label>
+                      <Input value={tenant?.id ?? ''} readOnly className="font-mono bg-gray-50 dark:bg-slate-800" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>API Keys</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Live Key</label>
+                      <div className="flex items-center gap-2">
+                        <Input value="sk_live_••••••••••••••••" readOnly className="font-mono bg-gray-50 dark:bg-slate-800" />
+                        <Button variant="outline" size="sm">Rotate</Button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Test Key</label>
+                      <Input value="sk_test_DOCS_SHARED_KEY" readOnly className="font-mono bg-gray-50 dark:bg-slate-800 text-xs" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Webhooks</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Webhook URL</label>
+                      <Input placeholder="https://your-app.com/webhooks" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Signing Secret</label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type={showSecret ? 'text' : 'password'}
+                          value="whsec_abcdef1234567890"
+                          readOnly
+                          className="font-mono bg-gray-50 dark:bg-slate-800"
+                        />
+                        <button
+                          onClick={() => setShowSecret(!showSecret)}
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-2"
+                        >
+                          {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                    <Button>Save webhook</Button>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {activeTab === 'apikeys' && (
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>API Keys</CardTitle>
+                      <Button size="sm" onClick={createKey} disabled={creating}>
+                        <Plus size={14} className="mr-1.5" />
+                        {creating ? 'Creating…' : 'New key'}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {newKey && (
+                      <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 space-y-2">
+                        <p className="text-xs font-medium text-emerald-800 dark:text-emerald-300">New key created — copy it now. It won't be shown again.</p>
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 rounded-lg px-3 py-2">
+                          <code className="flex-1 text-xs font-mono text-gray-900 dark:text-slate-100 break-all">{newKey}</code>
+                          <button onClick={copyNewKey} className="shrink-0 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+                            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                        <button onClick={() => setNewKey(null)} className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline">Dismiss</button>
+                      </div>
+                    )}
+
+                    {keysLoading ? (
+                      <p className="text-xs text-gray-400 dark:text-slate-500 py-4 text-center">Loading…</p>
+                    ) : keys.length === 0 ? (
+                      <p className="text-xs text-gray-400 dark:text-slate-500 py-4 text-center">No API keys yet. Create one above.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                        {keys.map((k) => (
+                          <div key={k.id} className="flex items-center justify-between py-3">
+                            <div>
+                              <code className="text-xs font-mono text-gray-900 dark:text-slate-100">{k.prefix}••••••••</code>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={cn('text-xs', k.mode === 'live' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>{k.mode}</span>
+                                <span className="text-xs text-gray-400 dark:text-slate-500">Created {new Date(k.created_at).toLocaleDateString()}</span>
+                                {k.revoked_at && <span className="text-xs text-red-500">Revoked</span>}
+                              </div>
+                            </div>
+                            {!k.revoked_at && (
+                              <button onClick={() => revokeKey(k.id)} className="text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {activeTab === 'billing' && (
+              <>
+                <Card>
+                  <CardHeader><CardTitle>Active Preset</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-emerald-500" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-slate-100">SaaS-Standard</span>
+                        <span className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">active</span>
+                      </div>
+                      <Button variant="outline" size="sm">Change preset</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Policy Knobs</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="When a customer upgrades, charge immediately with proration or wait until the next billing period">
+                        Upgrade Strategy
+                      </label>
+                      <Select value={upgradeStrategy} onChange={(e) => setUpgradeStrategy(e.target.value)}>
+                        <option value="immediate_prorated">Immediate (prorated)</option>
+                        <option value="at_period_end">At period end</option>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="When a customer downgrades, apply at end of period or immediately with credit">
+                        Downgrade Strategy
+                      </label>
+                      <Select value={downgradeStrategy} onChange={(e) => setDowngradeStrategy(e.target.value)}>
+                        <option value="at_period_end">At period end</option>
+                        <option value="immediate_credit">Immediate (with credit)</option>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="What plan changes to allow while a subscription is in dunning">
+                        Changes During Dunning
+                      </label>
+                      <Select value={dunningChanges} onChange={(e) => setDunningChanges(e.target.value)}>
+                        <option value="gate_upgrades">Gate upgrades only</option>
+                        <option value="block_all">Block all</option>
+                        <option value="allow_all">Allow all</option>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="Days of grace period after a charge fails before subscription is cancelled">
+                          Grace Period (days)
+                        </label>
+                        <Input type="number" value={graceDays} onChange={(e) => setGraceDays(e.target.value)} min="1" max="30" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="Maximum amount of debt allowed before marking a subscription delinquent">
+                          Max Debt Cap (₦)
+                        </label>
+                        <Input type="number" value={maxDebt} onChange={(e) => setMaxDebt(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="Number of payment retry attempts before marking as delinquent">
+                          Max Dunning Attempts
+                        </label>
+                        <Input type="number" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} min="1" max="6" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5" title="Day of month to attempt charges (for payday-aligned billing)">
+                          Payday Day (1–31)
+                        </label>
+                        <Input type="number" value={paydayDay} onChange={(e) => setPaydayDay(e.target.value)} min="1" max="31" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Button onClick={handleSave}>
+                        {saved ? '✓ Saved' : 'Save policy'}
+                      </Button>
+                      {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Changes saved</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {activeTab === 'testmode' && (
+              <>
+                <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <p className="text-xs text-amber-800 dark:text-amber-300">
+                    Test mode changes are isolated to your test API key. No real payments are processed.
+                  </p>
+                </div>
+
+                <Card>
+                  <CardHeader><CardTitle>Simulated Clock</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">Current simulated time</p>
+                        <p className="text-sm font-mono font-semibold text-gray-900 dark:text-slate-100">2026-06-17T00:00:00Z</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">
+                        Advance by (seconds)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="e.g. 86400 = 1 day"
+                          value={clockSeconds}
+                          onChange={(e) => setClockSeconds(e.target.value)}
+                        />
+                        <Button disabled={!clockSeconds}>Advance</Button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm">Advance 1 month</Button>
+                      <Button variant="outline" size="sm">Advance 1 year</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Billing Tick</CardTitle></CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                      Run the billing engine tick manually to process due invoices, retries, and state transitions.
+                    </p>
+                    <Button onClick={runTick} disabled={tickRunning}>
+                      {tickRunning ? 'Running…' : 'Run tick now'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

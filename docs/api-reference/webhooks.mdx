@@ -1,0 +1,121 @@
+---
+title: 'Webhooks'
+description: 'Register endpoints and verify signatures for incoming events.'
+---
+
+## Register a webhook endpoint
+
+```bash
+curl -X POST https://api.useplinth.com/v1/webhook-endpoints \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://yourapp.com/webhooks/nomba",
+    "events": ["subscription.renewed", "subscription.past_due", "invoice.paid"]
+  }'
+```
+
+Pass `"events": ["*"]` to receive all event types.
+
+**Request body**
+
+<ParamField body="url" type="string" required>
+  The HTTPS endpoint to send events to.
+</ParamField>
+
+<ParamField body="events" type="array" required>
+  List of event types to subscribe to, or `["*"]` for all events.
+</ParamField>
+
+**Response**
+
+```json
+{
+  "id": "we_01JXYZ...",
+  "url": "https://yourapp.com/webhooks/nomba",
+  "events": ["subscription.renewed", "subscription.past_due", "invoice.paid"],
+  "secret": "whsec_abc123...",
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+Store the `secret` — it's shown only once. Use it to verify signatures.
+
+---
+
+## Signature verification
+
+Every webhook request includes `X-Nomba-Signature` in the headers. Verify it before processing.
+
+```typescript
+import { constructEvent } from '@nomba/sdk/webhooks';
+import express from 'express';
+
+const app = express();
+
+app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-nomba-signature'] as string;
+
+  let event;
+  try {
+    event = constructEvent(
+      req.body,
+      signature,
+      process.env.NOMBA_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    return res.status(400).send('Invalid signature');
+  }
+
+  switch (event.type) {
+    case 'subscription.renewed':
+      // Handle renewal
+      break;
+    case 'invoice.paid':
+      // Handle payment
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+**Manual verification (without SDK):**
+
+```typescript
+import crypto from 'crypto';
+
+function verifySignature(payload: Buffer, signature: string, secret: string): boolean {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  );
+}
+```
+
+Use `crypto.timingSafeEqual` to prevent timing attacks.
+
+---
+
+## List webhook endpoints
+
+```bash
+curl https://api.useplinth.com/v1/webhook-endpoints \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+---
+
+## Delete a webhook endpoint
+
+```bash
+curl -X DELETE https://api.useplinth.com/v1/webhook-endpoints/we_01JXYZ... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+See [Webhook events](/webhook-events) for the full list of event types and payload examples.

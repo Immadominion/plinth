@@ -1,0 +1,44 @@
+---
+title: 'Transfer-First'
+description: 'Built for customer bases that primarily pay by bank transfer.'
+---
+
+Transfer-First is designed for products where bank transfer is the dominant payment method — corporate customers, public sector, or any segment where cards are uncommon or distrusted. The long grace period accounts for the reality that bank transfers can take days to initiate through finance team approval chains.
+
+## Who should use this
+
+- B2B SaaS selling to Nigerian corporate and enterprise customers
+- Products where customers explicitly prefer bank transfer over card
+- Services sold to government agencies or large institutions
+- Any product using the Transfer billing rail for most subscriptions
+
+## Settings
+
+| Policy knob | Value | Why |
+|---|---|---|
+| Upgrade strategy | Immediate, prorated | Charge now (or await transfer), upgrade now |
+| Downgrade strategy | At period end | Standard — no mid-cycle credits |
+| Grace period | 21 days | Bank transfers can take days to initiate. Finance teams, approval chains, and public holidays all create delays. 21 days is realistic. |
+| Dunning retries | 4 (for card fallback) | If a card is on file, still retry. Transfer subscriptions stay open during grace. |
+| Plan changes while `past_due` | Allow everything | Customer is waiting for finance to approve the transfer — don't block them from adjusting their plan |
+| Billing mode | Advance | Invoice at start of period |
+| Max debt | None | Let outstanding invoices accumulate — reconcile periodically |
+
+## Apply
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/tenant/apply-preset \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "transfer_first"}'
+```
+
+```typescript Node.js
+await client.tenant.applyPreset('transfer_first');
+```
+</CodeGroup>
+
+<Note>
+With a 21-day grace period, customers have access well into the next billing cycle while their payment is pending. This is intentional — cutting off a corporate customer because their AP team is slow will cost you the account. Monitor the `subscription.grace` webhook and follow up via your account management process rather than automated cutoffs.
+</Note>

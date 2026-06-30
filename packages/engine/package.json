@@ -1,0 +1,42 @@
+{
+  "name": "@nomba/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsc --project tsconfig.json",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run test/phase0.test.ts test/integration",
+    "test:coverage": "vitest run --coverage",
+    "db:generate": "tsx --env-file=../../.env ./node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "tsx --env-file=../../.env ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio": "tsx --env-file=../../.env ./node_modules/drizzle-kit/bin.cjs studio"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@hono/zod-validator": "^0.4.1",
+    "@types/nodemailer": "^8.0.1",
+    "bullmq": "^5.13.0",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.0",
+    "ioredis": "^5.3.2",
+    "nodemailer": "^9.0.3",
+    "postgres": "^3.4.4",
+    "ulid": "^2.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@vitest/coverage-v8": "^2.1.6",
+    "drizzle-kit": "^0.27.2",
+    "fast-check": "^3.23.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.6"
+  }
+}

@@ -1,0 +1,153 @@
+---
+title: 'Plans'
+description: 'Create plan groups and plans. Plans define what to charge and how often.'
+---
+
+## POST /v1/plan-groups
+
+Create a plan group — a logical container for related plans (e.g., all monthly tiers).
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/plan-groups \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Core Plans",
+    "description": "Standard monthly tiers"
+  }'
+```
+
+```typescript Node.js
+const group = await client.planGroups.create({
+  name: 'Core Plans',
+  description: 'Standard monthly tiers',
+});
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="name" type="string" required>
+  Display name for the group (e.g., "Monthly Plans", "Annual Plans").
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description.
+</ParamField>
+
+**Response**
+
+<ResponseField name="id" type="string">
+  Plan group ID. Format: `pg_01...`
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Group name.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp.
+</ResponseField>
+
+---
+
+## POST /v1/plan-groups/:id/plans
+
+Create a plan inside a group.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/plan-groups/pg_01JABC.../plans \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Pro",
+    "amount_minor": 500000,
+    "interval": "month",
+    "trial_period_days": 14
+  }'
+```
+
+```typescript Node.js
+const plan = await client.planGroups.createPlan('pg_01JABC...', {
+  name: 'Pro',
+  amountMinor: 500000,
+  interval: 'month',
+  trialPeriodDays: 14,
+});
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="name" type="string" required>
+  Plan name shown on invoices (e.g., "Starter", "Pro", "Max").
+</ParamField>
+
+<ParamField body="amount_minor" type="number" required>
+  Price in kobo. ₦5,000/month = `500000`.
+</ParamField>
+
+<ParamField body="interval" type="string" required>
+  Billing interval. Values: `month`, `year`.
+</ParamField>
+
+<ParamField body="trial_period_days" type="number">
+  Number of days for a free trial. New subscribers start in `trialing` state and aren't charged until the trial ends.
+</ParamField>
+
+**Response**
+
+<ResponseField name="id" type="string">
+  Plan ID. Format: `plan_...`
+</ResponseField>
+
+<ResponseField name="plan_group_id" type="string">
+  The group this plan belongs to.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Plan name.
+</ResponseField>
+
+<ResponseField name="amount_minor" type="number">
+  Price in kobo.
+</ResponseField>
+
+<ResponseField name="interval" type="string">
+  `month` or `year`.
+</ResponseField>
+
+<ResponseField name="trial_period_days" type="number">
+  Trial duration. `null` if no trial.
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the plan is available for new subscriptions.
+</ResponseField>
+
+---
+
+## GET /v1/plans
+
+List all active plans across all groups.
+
+```bash
+curl "https://api.useplinth.com/v1/plans?plan_group_id=pg_01JABC..." \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+**Query parameters**
+
+<ParamField query="plan_group_id" type="string">
+  Filter to a specific group.
+</ParamField>
+
+<ParamField query="active" type="boolean">
+  Filter by active status. Default: `true`.
+</ParamField>
+
+<ParamField query="interval" type="string">
+  Filter by interval: `month` or `year`.
+</ParamField>

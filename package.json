@@ -1,0 +1,21 @@
+{
+  "name": "plinth",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-tenant recurring-billing layer on Nomba's payment APIs",
+  "scripts": {
+    "dev": "pnpm --filter engine dev",
+    "build": "pnpm --filter engine build",
+    "test": "pnpm --filter engine test",
+    "test:run": "pnpm --filter engine test:run",
+    "db:migrate": "pnpm --filter engine db:migrate",
+    "db:generate": "pnpm --filter engine db:generate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "msgpackr-extract"]
+  }
+}

@@ -1,0 +1,99 @@
+---
+title: 'Subscriptions'
+description: 'A subscription is a recurring billing relationship between a customer and a plan.'
+---
+
+When you subscribe a customer to a plan, you're telling us: charge this customer this amount on this schedule, automatically, until further notice. That's a subscription. It handles renewals, state transitions, and collection — you just listen to webhooks and gate access accordingly.
+
+## Lifecycle
+
+```
+created
+  └─→ trialing ──────────────────────────────→ active
+  └─→ active ──→ past_due ──→ grace ──→ delinquent
+                    └─→ active (recovered)
+  └─→ active ──→ paused
+  └─→ active ──→ canceled
+```
+
+## State reference
+
+| State | What's happening | Customer access | What's next |
+|---|---|---|---|
+| `trialing` | Free trial running, no charge yet | Full access | Converts to `active` when trial ends |
+| `active` | All good, payments collecting | Full access | Renews at `next_bill_at` |
+| `past_due` | First renewal attempt failed | Full access | Retry schedule starts |
+| `grace` | All retries exhausted, grace window open | Full access | Grace expires → `delinquent` |
+| `delinquent` | Grace expired, no payment | No access | Customer needs to pay to restore |
+| `paused` | Manually paused | No access | Resume when ready |
+| `canceled` | Ended | No access | Final state |
+
+During `past_due` and `grace`, the customer still has access — cutting them off immediately for one failed payment loses customers unnecessarily. Once `delinquent`, access is cut until they pay.
+
+## Two billing rails
+
+**Card billing** — You tokenise the customer's card once via Nomba, pass the token when creating the subscription. On each renewal, we charge the card automatically.
+
+**Transfer billing** — The customer has a dedicated virtual account number (bank name + account number). On renewal, instead of charging a card, we open an invoice and wait for the customer to send a bank transfer. When it arrives, we match it automatically and close the invoice.
+
+Set the rail on subscription creation:
+
+```bash
+# Card billing
+{
+  "payment_method": "card",
+  "payment_method_id": "tok_abc123"
+}
+
+# Transfer billing
+{
+  "payment_method": "transfer"
+}
+```
+
+## Create a subscription
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: create-sub-acme-pro-jun26" \
+  -d '{
+    "customer_id": "cus_01JXYZ...",
+    "plan_id": "plan_pro_01...",
+    "payment_method": "card",
+    "payment_method_id": "tok_test_visa"
+  }'
+```
+
+```typescript Node.js
+const subscription = await client.subscriptions.create({
+  customerId: 'cus_01JXYZ...',
+  planId: 'plan_pro_01...',
+  paymentMethod: 'card',
+  paymentMethodId: 'tok_test_visa',
+}, {
+  idempotencyKey: 'create-sub-acme-pro-jun26',
+});
+```
+</CodeGroup>
+
+```json Response
+{
+  "id": "sub_01JABC...",
+  "customer_id": "cus_01JXYZ...",
+  "plan_id": "plan_pro_01...",
+  "state": "active",
+  "payment_method": "card",
+  "billing_mode": "advance",
+  "current_period_start": "2026-06-01T00:00:00Z",
+  "current_period_end": "2026-07-01T00:00:00Z",
+  "next_bill_at": "2026-07-01T00:00:00Z",
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+<Note>
+Use idempotency keys on subscription creation. If your request times out and you retry, the same key returns the original response instead of creating a duplicate subscription.
+</Note>

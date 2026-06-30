@@ -1,0 +1,107 @@
+---
+title: 'Plans & pricing'
+description: 'A plan sets the price and billing interval. Customers subscribe to plans.'
+---
+
+A plan defines how much to charge and how often. Plans live inside plan groups — a group is your tier structure (e.g., "Core Plans" with Starter, Pro, and Max inside it).
+
+## Plan groups and plans
+
+A **plan group** is a logical container. You might have one group called "Monthly Plans" and another called "Annual Plans", or one called "Core" and another called "Enterprise".
+
+A **plan** belongs to a group and has:
+- A name (e.g., "Pro")
+- An amount in kobo (e.g., 500000 for ₦5,000)
+- A billing interval (`month` or `year`)
+- An optional trial period in days
+
+## Create a plan group and plan
+
+First, create the group:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/plan-groups \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Core Plans",
+    "description": "Standard monthly tiers"
+  }'
+```
+
+```typescript Node.js
+const group = await client.planGroups.create({
+  name: 'Core Plans',
+  description: 'Standard monthly tiers',
+});
+// → { id: 'pg_01JABC...', name: 'Core Plans', ... }
+```
+</CodeGroup>
+
+Then create plans inside it:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/plan-groups/pg_01JABC.../plans \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Pro",
+    "amount_minor": 500000,
+    "interval": "month",
+    "trial_period_days": 14
+  }'
+```
+
+```typescript Node.js
+const plan = await client.planGroups.createPlan('pg_01JABC...', {
+  name: 'Pro',
+  amountMinor: 500000,
+  interval: 'month',
+  trialPeriodDays: 14,
+});
+```
+</CodeGroup>
+
+```json Response
+{
+  "id": "plan_pro_01...",
+  "plan_group_id": "pg_01JABC...",
+  "name": "Pro",
+  "amount_minor": 500000,
+  "interval": "month",
+  "trial_period_days": 14,
+  "active": true,
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+## Trial periods
+
+Set `trial_period_days` on a plan. New subscribers start in `trialing` state and aren't charged until the trial ends. When the trial expires, the subscription transitions to `active` and the first invoice is created.
+
+If a subscriber cancels during trial, they're never charged. The `subscription.canceled` webhook fires.
+
+## Amounts are in kobo
+
+<Note>
+All `amount_minor` values are in kobo — 1/100th of a Naira. Never pass decimal values.
+</Note>
+
+| Naira price | `amount_minor` |
+|---|---|
+| ₦500/month | 50000 |
+| ₦2,000/month | 200000 |
+| ₦5,000/month | 500000 |
+| ₦12,000/month | 1200000 |
+| ₦120,000/year | 12000000 |
+
+## List all plans
+
+```bash
+curl https://api.useplinth.com/v1/plans \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+Returns all active plans across all groups. Pass `?plan_group_id=pg_01JABC...` to filter by group.

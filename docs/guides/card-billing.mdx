@@ -1,0 +1,179 @@
+---
+title: 'Card billing (SaaS-Standard setup)'
+description: 'The standard SaaS flow: tokenise a card once, charge automatically on renewal.'
+---
+
+Card billing is the simplest setup. Your customer enters their card details once, and we charge automatically on every renewal. No card re-entry, no manual follow-up — unless the card fails.
+
+<Steps>
+  <Step title="Create a plan group and plans">
+    First, set up your pricing tiers.
+
+    <CodeGroup>
+    ```bash cURL
+    # Create the plan group
+    curl -X POST https://api.useplinth.com/v1/plan-groups \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "Core Plans"}'
+
+    # Create a plan inside it
+    curl -X POST https://api.useplinth.com/v1/plan-groups/pg_01JABC.../plans \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Pro",
+        "amount_minor": 500000,
+        "interval": "month",
+        "trial_period_days": 14
+      }'
+    ```
+
+    ```typescript Node.js
+    const group = await client.planGroups.create({ name: 'Core Plans' });
+
+    const plan = await client.planGroups.createPlan(group.id, {
+      name: 'Pro',
+      amountMinor: 500000,
+      interval: 'month',
+      trialPeriodDays: 14,
+    });
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a customer">
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/v1/customers \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Kuda Technologies",
+        "email": "billing@kuda.ng",
+        "external_ref": "usr_5521"
+      }'
+    ```
+
+    ```typescript Node.js
+    const customer = await client.customers.create({
+      name: 'Kuda Technologies',
+      email: 'billing@kuda.ng',
+      externalRef: 'usr_5521',
+    });
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Tokenise the card">
+    Card tokenisation happens through Nomba's payment SDK on your frontend — the customer's raw card number never touches your server. Nomba returns a token (starts with `tok_`). Pass that token to Plinth.
+
+    See [Nomba's card tokenisation docs](https://developer.nomba.com/docs/card-tokenisation) for the frontend integration. The result is a token like `tok_live_4x8bZ...`.
+
+    In test mode, use the pre-built test tokens:
+
+    | Token | Behaviour |
+    |---|---|
+    | `tok_test_visa` | Always succeeds |
+    | `tok_test_decline` | Always declines |
+    | `tok_test_decline_hard` | Hard decline (stolen card) |
+    | `tok_test_decline_soft` | Soft decline (insufficient funds) |
+  </Step>
+
+  <Step title="Create the subscription">
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/v1/subscriptions \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: sub-kuda-pro-jun26" \
+      -d '{
+        "customer_id": "cus_01JXYZ...",
+        "plan_id": "plan_pro_01...",
+        "payment_method": "card",
+        "payment_method_id": "tok_test_visa"
+      }'
+    ```
+
+    ```typescript Node.js
+    const subscription = await client.subscriptions.create({
+      customerId: 'cus_01JXYZ...',
+      planId: 'plan_pro_01...',
+      paymentMethod: 'card',
+      paymentMethodId: 'tok_test_visa',
+    }, { idempotencyKey: 'sub-kuda-pro-jun26' });
+    ```
+    </CodeGroup>
+
+    ```json Response
+    {
+      "id": "sub_01JABC...",
+      "state": "active",
+      "next_bill_at": "2026-07-01T00:00:00Z"
+    }
+    ```
+
+    If the plan has a trial, the state will be `trialing` instead of `active`, and `next_bill_at` will be the trial end date.
+  </Step>
+
+  <Step title="Subscription renews automatically">
+    When `next_bill_at` arrives, the billing engine:
+
+    1. Creates an invoice for the new period
+    2. Applies any customer balance credit first
+    3. Charges the card for the remainder
+    4. Marks the invoice `paid`
+    5. Updates `next_bill_at` to the next period
+    6. Fires `subscription.renewed` and `invoice.paid` webhooks
+
+    You don't need to do anything. Listen for the webhook and update your records.
+  </Step>
+
+  <Step title="Handle renewal webhooks">
+    ```typescript Node.js
+    switch (event.type) {
+      case 'subscription.renewed':
+        // Invoice paid, access continues
+        await db.subscriptions.update(event.data.subscription_id, {
+          status: 'active',
+          currentPeriodEnd: event.data.period_end,
+        });
+        break;
+
+      case 'invoice.paid':
+        // Optional: record payment in your system
+        await db.invoices.markPaid(event.data.invoice_id, {
+          paidAt: event.data.paid_at,
+          amountMinor: event.data.amount_minor,
+        });
+        break;
+    }
+    ```
+  </Step>
+
+  <Step title="Handle failed renewals">
+    When a card declines on renewal, the subscription moves to `past_due` and the retry schedule starts. Listen for these:
+
+    ```typescript Node.js
+    case 'subscription.past_due':
+      // Show a payment warning in your app
+      await notifyCustomer(event.data.customer_id, {
+        type: 'card_failed',
+        message: 'Your card was declined. Please update your payment method.',
+      });
+      break;
+
+    case 'subscription.recovered':
+      // A retry succeeded — clear the warning
+      await clearPaymentWarning(event.data.customer_id);
+      break;
+
+    case 'subscription.delinquent':
+      // All retries exhausted, grace expired — cut access
+      await revokeAccess(event.data.customer_id);
+      break;
+    ```
+
+    See the [dunning guide](/guides/dunning) for the full retry schedule and what to do at each step.
+  </Step>
+</Steps>

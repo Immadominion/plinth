@@ -1,0 +1,84 @@
+---
+title: 'Arrears / postpaid billing'
+description: 'Invoice at the end of the period instead of the beginning. Useful for usage-based or enterprise contracts.'
+---
+
+Arrears billing flips the default: instead of charging at the start of a billing period, we charge at the end. The customer uses the service first and pays for what they used.
+
+## When to use arrears
+
+- **Usage-based billing** — you meter API calls, seats, or transactions during the month, then bill based on actual usage
+- **Enterprise contracts** — the customer has net-30 or net-60 payment terms
+- **Trials converting to paid** — bill after the first period so the customer experiences the value before the first charge
+- **Credit-gated models** — customer has a credit limit; you bill after confirming usage
+
+## How it works
+
+With `billing_mode: "advance"` (default), the invoice is created at the start of the period:
+
+```
+June 1: Invoice created → charge → period begins
+June 30: Period ends
+July 1: Next invoice created → charge → new period begins
+```
+
+With `billing_mode: "arrears"`:
+
+```
+June 1: Period begins (no invoice yet)
+June 30: Period ends
+July 1: Invoice created → charge → new period begins
+```
+
+The invoice and payment logic are identical — it's only the timing that differs.
+
+| | Advance (default) | Arrears |
+|---|---|---|
+| Invoice created | Start of period | End of period |
+| Customer pays | Before using service | After using service |
+| Grace / dunning | Same | Same (starts after invoice is created) |
+| `next_bill_at` meaning | Next charge date | Next invoice creation date |
+
+## Setting up arrears billing
+
+Add `billing_mode: "arrears"` when creating the subscription:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cus_01JXYZ...",
+    "plan_id": "plan_enterprise_01...",
+    "payment_method": "transfer",
+    "billing_mode": "arrears"
+  }'
+```
+
+```typescript Node.js
+const subscription = await client.subscriptions.create({
+  customerId: 'cus_01JXYZ...',
+  planId: 'plan_enterprise_01...',
+  paymentMethod: 'transfer',
+  billingMode: 'arrears',
+});
+```
+</CodeGroup>
+
+```json Response
+{
+  "id": "sub_01JABC...",
+  "state": "active",
+  "billing_mode": "arrears",
+  "current_period_start": "2026-06-01T00:00:00Z",
+  "current_period_end": "2026-07-01T00:00:00Z",
+  "next_bill_at": "2026-07-01T00:00:00Z"
+}
+```
+
+`next_bill_at` is July 1st — that's when the June invoice is created and the July period begins simultaneously.
+
+<Note>
+The Postpaid preset applies arrears billing along with a longer grace period (14 days) and more lenient dunning settings. If you're doing enterprise billing, applying the Postpaid preset first is quicker than configuring each knob. See [Presets](/presets/postpaid).
+</Note>

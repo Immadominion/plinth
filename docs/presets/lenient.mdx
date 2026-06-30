@@ -1,0 +1,44 @@
+---
+title: 'Lenient'
+description: 'For B2B customers where losing one account hurts more than waiting on payment.'
+---
+
+Use Lenient when your customers are high-value businesses, when churn is expensive, and when you'd rather give extra time and flexibility than cut access at the first sign of payment trouble.
+
+## Who should use this
+
+- B2B SaaS with enterprise or mid-market customers
+- Products where a churned customer is hard to win back
+- Services where your customers have their own payment approval cycles (e.g., finance teams that batch payments weekly)
+- Early-stage products where keeping customers happy matters more than strict collection
+
+## Settings
+
+| Policy knob | Value | Why |
+|---|---|---|
+| Upgrade strategy | At period end | No immediate charges — simplifies the customer experience |
+| Downgrade strategy | At period end | Same — everything changes at renewal |
+| Grace period | 14 days | Two weeks gives enterprise finance teams time to act |
+| Dunning retries | 4 (days +1, +3, +7, +14) | Standard schedule |
+| Plan changes while `past_due` | Allow everything | Don't block customers from adjusting their plan even if payment is pending |
+| Billing mode | Advance | Invoice at start of period |
+| Max debt | None | No cap |
+
+## Apply
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/tenant/apply-preset \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "lenient"}'
+```
+
+```typescript Node.js
+await client.tenant.applyPreset('lenient');
+```
+</CodeGroup>
+
+<Note>
+With all plan changes deferred to period end, customers won't be charged anything extra mid-cycle for upgrades. This reduces friction but means upgrades take effect at the next renewal — make sure your UI makes this clear.
+</Note>

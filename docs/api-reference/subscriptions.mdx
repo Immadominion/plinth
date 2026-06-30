@@ -1,0 +1,151 @@
+---
+title: 'Subscriptions'
+description: 'Create, retrieve, and manage billing relationships between customers and plans.'
+---
+
+## POST /v1/subscriptions
+
+Create a subscription for a customer.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: sub-acme-pro-jun26" \
+  -d '{
+    "customer_id": "cus_01JXYZ...",
+    "plan_id": "plan_pro_01...",
+    "payment_method": "card",
+    "payment_method_id": "tok_test_visa"
+  }'
+```
+
+```typescript Node.js
+const subscription = await client.subscriptions.create({
+  customerId: 'cus_01JXYZ...',
+  planId: 'plan_pro_01...',
+  paymentMethod: 'card',
+  paymentMethodId: 'tok_test_visa',
+}, { idempotencyKey: 'sub-acme-pro-jun26' });
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="customer_id" type="string" required>
+  The customer to subscribe.
+</ParamField>
+
+<ParamField body="plan_id" type="string" required>
+  The plan to subscribe the customer to.
+</ParamField>
+
+<ParamField body="payment_method" type="string" required>
+  Payment rail. Values: `card`, `transfer`.
+</ParamField>
+
+<ParamField body="payment_method_id" type="string">
+  Card token (required if `payment_method` is `card`). Not used for `transfer`.
+</ParamField>
+
+<ParamField body="billing_mode" type="string">
+  `advance` (default) or `arrears`. See [arrears billing guide](/guides/arrears-billing).
+</ParamField>
+
+<ParamField body="start_at" type="string">
+  ISO 8601 date to start the subscription. Defaults to now.
+</ParamField>
+
+---
+
+## GET /v1/subscriptions/:id
+
+Retrieve a subscription.
+
+```bash
+curl https://api.useplinth.com/v1/subscriptions/sub_01JABC... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "id": "sub_01JABC...",
+  "customer_id": "cus_01JXYZ...",
+  "plan_id": "plan_pro_01...",
+  "state": "active",
+  "payment_method": "card",
+  "billing_mode": "advance",
+  "current_period_start": "2026-06-01T00:00:00Z",
+  "current_period_end": "2026-07-01T00:00:00Z",
+  "next_bill_at": "2026-07-01T00:00:00Z",
+  "trial_end": null,
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+---
+
+## GET /v1/subscriptions/:id/status
+
+Get a quick status summary — state, next billing date, and how long the subscription has been in the current state.
+
+```bash
+curl https://api.useplinth.com/v1/subscriptions/sub_01JABC.../status \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "state": "past_due",
+  "next_bill_at": "2026-07-01T00:00:00Z",
+  "days_in_state": 3,
+  "grace_expires_at": null,
+  "next_retry_at": "2026-06-04T00:00:00Z"
+}
+```
+
+---
+
+## POST /v1/subscriptions/:id/cancel
+
+Cancel a subscription. By default, the subscription stays active until the current period ends, then cancels.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../cancel \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"immediately": false}'
+```
+
+```typescript Node.js
+await client.subscriptions.cancel('sub_01JABC...', { immediately: false });
+```
+</CodeGroup>
+
+<ParamField body="immediately" type="boolean">
+  `false` (default) — cancel at period end. `true` — cancel and revoke access now.
+</ParamField>
+
+---
+
+## POST /v1/subscriptions/:id/pause
+
+Pause a subscription. Billing stops. Access is revoked immediately.
+
+```bash
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../pause \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+---
+
+## POST /v1/subscriptions/:id/resume
+
+Resume a paused subscription. Billing restarts. If the pause was mid-period, the remaining days are added to the current period.
+
+```bash
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../resume \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```

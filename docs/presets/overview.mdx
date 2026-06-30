@@ -1,0 +1,57 @@
+---
+title: 'Billing presets'
+description: 'Named policy bundles. Pick one and your billing behaviour is configured. Change individual knobs later if you want.'
+---
+
+A preset is a named set of billing rules. Instead of configuring 7 separate policy knobs, you pick a preset that fits your business model and you're done. You can always override individual settings afterward.
+
+## The five presets
+
+<CardGroup cols={2}>
+  <Card title="SaaS-Standard" icon="star" href="/presets/saas-standard">
+    **Recommended starting point.** Immediate upgrades, downgrades at period end, 7-day grace, block changes while past due.
+  </Card>
+  <Card title="Lenient" icon="hand" href="/presets/lenient">
+    For B2B or high-value customers where churn is costly. 14-day grace, no change restrictions.
+  </Card>
+  <Card title="Strict" icon="shield" href="/presets/strict">
+    For services where access is tightly tied to payment. 3-day grace, block all plan changes while past due.
+  </Card>
+  <Card title="Transfer-First" icon="building-columns" href="/presets/transfer-first">
+    For customer bases that primarily pay by bank transfer. 21-day grace window, very lenient dunning.
+  </Card>
+  <Card title="Postpaid / Arrears" icon="calendar" href="/presets/postpaid">
+    Arrears billing mode, 14-day grace. For enterprise contracts and usage-based models.
+  </Card>
+</CardGroup>
+
+## Comparison
+
+| Preset | Upgrade timing | Downgrade timing | Grace period | While past due |
+|---|---|---|---|---|
+| SaaS-Standard | Immediate, prorated | At period end | 7 days | Block upgrades |
+| Lenient | At period end | At period end | 14 days | Allow everything |
+| Strict | Immediate, prorated | Immediate credit | 3 days | Block all changes |
+| Transfer-First | Immediate, prorated | At period end | 21 days | Allow everything |
+| Postpaid / Arrears | Immediate, prorated | At period end | 14 days | Block upgrades |
+
+## Apply a preset
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/tenant/apply-preset \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "saas_standard"}'
+```
+
+```typescript Node.js
+await client.tenant.applyPreset('saas_standard');
+```
+</CodeGroup>
+
+Valid preset names: `saas_standard`, `lenient`, `strict`, `transfer_first`, `postpaid`.
+
+## After applying
+
+The preset updates your TenantPolicy. Existing subscriptions aren't affected retroactively — only new billing cycles apply the new rules. If you need to change behaviour for an in-flight subscription, contact support or use a per-subscription override.

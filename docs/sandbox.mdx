@@ -1,0 +1,183 @@
+---
+title: 'Sandbox'
+description: 'Test against a live API without a Nomba account. Two options: shared (instant) or your own isolated environment.'
+---
+
+## Two sandboxes, two use cases
+
+<CardGroup cols={2}>
+  <Card title="Shared sandbox" icon="globe">
+    Always available. No setup. Use `sk_test_DOCS_SHARED_KEY` in any request right now. Best for reading the docs and testing single calls.
+  </Card>
+  <Card title="Your own sandbox" icon="flask">
+    Isolated tenant, private API key, your own clock. Best for integration testing, CI, or anything where you need clean data.
+  </Card>
+</CardGroup>
+
+---
+
+## Shared sandbox
+
+The shared sandbox is a real tenant pre-seeded with three plans and a test customer. Every code example in these docs points at it. You can run any `curl` straight from your terminal without signing up.
+
+```bash
+# Try it right now — list the pre-seeded plans
+curl https://api.useplinth.com/v1/plans \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+**What's pre-seeded:**
+
+| Resource | Details |
+|---|---|
+| Plans | Starter (₦2,000/month), Pro (₦5,000/month), Max (₦12,000/month) |
+| Customer | `cus_docs_001` — `customer@docs-sandbox.ng` |
+| Clock | Controllable — advance it to simulate renewals |
+
+**Limits on the shared sandbox:**
+
+- Clock advances are rate-limited to **1 per minute** — prevents one reader from breaking examples for everyone else
+- Write operations (create customers, subscriptions) work but data is shared across all readers
+
+For anything more than single-call testing, use your own sandbox.
+
+---
+
+## Your own sandbox
+
+One call gives you an isolated tenant with your own API key, plans, and clock. It expires automatically after 24 hours.
+
+<Steps>
+  <Step title="Create your sandbox">
+    Call `POST /sandbox/create` — no API key required, it's a public endpoint.
+
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/sandbox/create
+    ```
+
+    ```typescript Node.js
+    const res = await fetch('https://api.useplinth.com/sandbox/create', {
+      method: 'POST',
+    });
+    const sandbox = await res.json();
+    console.log(sandbox.api_key); // sk_test_...
+    ```
+    </CodeGroup>
+
+    ```json Response
+    {
+      "object": "sandbox",
+      "tenant_id": "ten_01JXY...",
+      "api_key": "sk_test_a1b2c3d4e5f6...",
+      "expires_at": "2026-06-19T12:00:00Z",
+      "plans": [
+        { "id": "pln_01JAA...", "name": "Starter", "amount_minor": "200000", "currency": "NGN", "interval": "month" },
+        { "id": "pln_01JAB...", "name": "Pro",     "amount_minor": "500000", "currency": "NGN", "interval": "month" },
+        { "id": "pln_01JAC...", "name": "Max",     "amount_minor": "1200000","currency": "NGN", "interval": "month" }
+      ],
+      "customer": {
+        "id": "cus_01JAD...",
+        "name": "Sandbox Customer",
+        "email": "customer@sandbox.ng"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Save your API key">
+    Export it as an environment variable so every subsequent call uses it automatically.
+
+    ```bash
+    export NOMBA_KEY="sk_test_a1b2c3d4e5f6..."
+    ```
+
+    Or click **"Use my sandbox key"** below to have these docs swap every code block automatically.
+  </Step>
+
+  <Step title="Run calls against your isolated tenant">
+    ```bash
+    # Subscribe your pre-seeded customer to Pro
+    curl -X POST https://api.useplinth.com/v1/subscriptions \
+      -H "Authorization: Bearer $NOMBA_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"customer_id\": \"<your customer id from the response above>\",
+        \"plan_id\": \"<your pro plan id>\",
+        \"payment_method_id\": \"tok_test_visa\"
+      }"
+    ```
+  </Step>
+
+  <Step title="Fast-forward time">
+    Your sandbox has its own clock. Advance it to trigger renewals and test dunning without waiting.
+
+    ```bash
+    # Advance 1 month
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -H "Authorization: Bearer $NOMBA_KEY" \
+      -d '{"advanceSeconds": 2592000}'
+
+    # Run the billing tick
+    curl -X POST "https://api.useplinth.com/admin/tick?tenant_id=<your tenant id>" \
+      -H "Authorization: Bearer $NOMBA_KEY"
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Use my sandbox key in these docs
+
+Paste your sandbox API key below. Every code block on this site will show your key instead of `sk_test_DOCS_SHARED_KEY`. Nothing is sent anywhere — it's stored only in your browser's localStorage.
+
+<Note>
+  This is a client-side convenience feature. Your key is never transmitted to our servers through this form — only via the API calls you make from your own terminal.
+</Note>
+
+<div id="sandbox-key-form" style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+  <input
+    id="sandbox-key-input"
+    type="password"
+    placeholder="sk_test_..."
+    style={{
+      flex: 1, minWidth: '260px', padding: '8px 12px',
+      borderRadius: '8px', border: '1px solid #e5e7eb',
+      fontFamily: 'monospace', fontSize: '13px',
+    }}
+  />
+  <button
+    onClick={() => {
+      const key = document.getElementById('sandbox-key-input').value.trim();
+      if (!key.startsWith('sk_test_')) {
+        alert('Key must start with sk_test_');
+        return;
+      }
+      localStorage.setItem('nomba_sandbox_key', key);
+      window.location.reload();
+    }}
+    style={{
+      padding: '8px 16px', background: '#4f46e5', color: '#fff',
+      border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
+    }}
+  >
+    Use this key →
+  </button>
+</div>
+
+---
+
+## Sandbox vs production
+
+| | Shared sandbox | Your sandbox | Production |
+|---|---|---|---|
+| API key prefix | `sk_test_` | `sk_test_` | `sk_live_` |
+| Real money | No | No | Yes |
+| Real Nomba account needed | No | No | Yes |
+| Isolated data | No (shared) | Yes | Yes |
+| Clock control | Yes (rate-limited) | Yes (full) | No |
+| Expires | Never | 24 hours | Never |
+
+<Warning>
+  Never use a `sk_live_` key in code examples or commit it to a repository. Live keys charge real cards.
+</Warning>

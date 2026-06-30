@@ -1,0 +1,57 @@
+---
+title: 'Tenants & API keys'
+description: 'A tenant is your company account. Everything — customers, plans, invoices — lives under it.'
+---
+
+A tenant is your workspace in Plinth. When you sign up, we create a tenant for your company. All your customers, plans, subscriptions, and invoices are scoped to that tenant. Nothing leaks between tenants.
+
+## Test vs live mode
+
+<Tabs>
+  <Tab title="Test mode">
+    Test mode gives you a fully functional sandbox. You can create customers, subscribe them to plans, advance the clock, trigger dunning — all without moving real money.
+
+    Test keys start with `sk_test_`. Use them in your development and staging environments.
+
+    The sandbox has pre-loaded test cards (including ones that fail) and pre-seeded plans. See the [test clock guide](/guides/test-clock) for simulating time-sensitive flows.
+  </Tab>
+  <Tab title="Live mode">
+    Live mode moves real money through Nomba's payment rails. You need a Nomba business account and completed KYC before a live key is issued.
+
+    Live keys start with `sk_live_`. Only use them in production. Never hardcode them.
+  </Tab>
+</Tabs>
+
+## API key format
+
+| Key type | Prefix | Where to use |
+|---|---|---|
+| Test secret key | `sk_test_` | Development, staging, CI |
+| Live secret key | `sk_live_` | Production only |
+
+## Authenticating requests
+
+Every API request requires your key in the `Authorization` header:
+
+```bash
+curl https://api.useplinth.com/v1/customers \
+  -H "Authorization: Bearer sk_test_YOUR_KEY"
+```
+
+```typescript
+import { Plinth } from '@nomba/sdk';
+
+const client = new Plinth({
+  apiKey: process.env.NOMBA_API_KEY!,
+});
+```
+
+<Warning>
+Never commit API keys to source control. Use environment variables. If a key is exposed, rotate it immediately from the dashboard — the old key stops working the moment you rotate.
+</Warning>
+
+## Key rotation
+
+Rotate keys from the [dashboard](https://app.useplinth.com/dashboard/api-keys). Issuing a new key doesn't invalidate the old one until you explicitly revoke it — giving you time to update your deployment.
+
+To revoke via API: `DELETE /v1/tenant/api-keys/{key_id}`.

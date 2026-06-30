@@ -1,0 +1,52 @@
+---
+title: 'Authentication'
+description: 'All API requests require a Bearer token in the Authorization header.'
+---
+
+Every request to the Plinth API must include your API key as a Bearer token.
+
+```bash
+curl https://api.useplinth.com/v1/customers \
+  -H "Authorization: Bearer sk_test_YOUR_KEY"
+```
+
+## Key types
+
+| Key prefix | Mode | Notes |
+|---|---|---|
+| `sk_test_` | Sandbox | No real money. Use in development and staging. |
+| `sk_live_` | Production | Real money. Requires a verified Nomba business account. |
+
+Test and live keys are completely separate. A test key never touches live data, and live keys don't have access to sandbox resources.
+
+## Getting a key
+
+Get your API key from the [dashboard](https://app.useplinth.com/dashboard/api-keys). Live keys require KYC completion on your Nomba account.
+
+## Invalid key response
+
+If you send an invalid or expired key, you get:
+
+```json
+{
+  "error": "unauthorized",
+  "message": "Invalid API key.",
+  "status": 401
+}
+```
+
+All other errors return `4xx` or `5xx` with the same `error` + `message` + `status` shape.
+
+## SDK initialisation
+
+```typescript
+import { Plinth } from '@nomba/sdk';
+
+const client = new Plinth({
+  apiKey: process.env.NOMBA_API_KEY!,
+});
+```
+
+<Warning>
+Never log or commit API keys. Use environment variables. If a key is compromised, rotate it immediately from the dashboard — the old key is invalidated instantly.
+</Warning>

@@ -1,0 +1,135 @@
+---
+title: 'Plan changes'
+description: 'Preview and commit mid-cycle plan changes with automatic proration.'
+---
+
+## POST /v1/subscriptions/:id/preview-change
+
+Preview what a plan change will cost before committing. Always call this first.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../preview-change \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"new_plan_id": "plan_max_01..."}'
+```
+
+```typescript Node.js
+const preview = await client.subscriptions.previewChange('sub_01JABC...', {
+  newPlanId: 'plan_max_01...',
+});
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="new_plan_id" type="string" required>
+  The plan to switch to.
+</ParamField>
+
+<ParamField body="strategy" type="string">
+  Override the default strategy. Values: `immediate`, `period_end`. Defaults to your TenantPolicy setting.
+</ParamField>
+
+**Response**
+
+<ResponseField name="direction" type="string">
+  `upgrade`, `downgrade`, or `lateral` (same price, different plan).
+</ResponseField>
+
+<ResponseField name="current_plan" type="string">
+  Name of the current plan.
+</ResponseField>
+
+<ResponseField name="new_plan" type="string">
+  Name of the new plan.
+</ResponseField>
+
+<ResponseField name="due_now_minor" type="number">
+  Kobo to charge now (upgrades with immediate strategy). `0` for period-end or downgrades.
+</ResponseField>
+
+<ResponseField name="credit_minor" type="number">
+  Kobo credited to the customer's balance (downgrades with immediate strategy). `0` otherwise.
+</ResponseField>
+
+<ResponseField name="scheduled_for" type="string">
+  ISO 8601 date if the change is deferred. `null` if it takes effect immediately.
+</ResponseField>
+
+<ResponseField name="line_items" type="array">
+  Breakdown of charges and credits. Each item has `description`, `amount_minor`, and `type` (`charge` or `credit`).
+</ResponseField>
+
+```json Response
+{
+  "direction": "upgrade",
+  "current_plan": "Pro",
+  "new_plan": "Max",
+  "due_now_minor": 443300,
+  "credit_minor": 0,
+  "new_plan_charge_minor": 760000,
+  "scheduled_for": null,
+  "line_items": [
+    {
+      "description": "Unused Pro (19 days remaining)",
+      "amount_minor": -316700,
+      "type": "credit"
+    },
+    {
+      "description": "Max plan (19 days remaining)",
+      "amount_minor": 760000,
+      "type": "charge"
+    }
+  ]
+}
+```
+
+---
+
+## POST /v1/subscriptions/:id/change-plan
+
+Commit the plan change.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../change-plan \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "new_plan_id": "plan_max_01...",
+    "strategy": "immediate"
+  }'
+```
+
+```typescript Node.js
+await client.subscriptions.changePlan('sub_01JABC...', {
+  newPlanId: 'plan_max_01...',
+  strategy: 'immediate',
+});
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="new_plan_id" type="string" required>
+  The plan to switch to.
+</ParamField>
+
+<ParamField body="strategy" type="string">
+  `immediate` or `period_end`. Defaults to TenantPolicy setting.
+</ParamField>
+
+---
+
+## DELETE /v1/subscriptions/:id/scheduled-change
+
+Cancel a pending plan change before it fires.
+
+```bash
+curl -X DELETE https://api.useplinth.com/v1/subscriptions/sub_01JABC.../scheduled-change \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+The subscription remains on the current plan. A `subscription.plan_change_canceled` event fires.

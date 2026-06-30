@@ -1,0 +1,448 @@
+---
+title: 'Webhook events catalog'
+description: 'Every event type we emit, what triggers it, and what the payload looks like.'
+---
+
+All events share the same envelope shape:
+
+```json
+{
+  "id": "evt_01JXYZ...",
+  "type": "subscription.renewed",
+  "tenant_id": "ten_abc...",
+  "resource_id": "sub_01JABC...",
+  "data": { ... },
+  "occurred_at": "2026-06-01T08:00:00Z"
+}
+```
+
+---
+
+## Subscription events
+
+<AccordionGroup>
+  <Accordion title="subscription.created">
+    **Trigger:** A new subscription is created.
+
+    ```json
+    {
+      "type": "subscription.created",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "plan_id": "plan_pro_01...",
+        "state": "active",
+        "payment_method": "card",
+        "current_period_start": "2026-06-01T00:00:00Z",
+        "current_period_end": "2026-07-01T00:00:00Z",
+        "next_bill_at": "2026-07-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.activated">
+    **Trigger:** A trial subscription converts to active (trial period ends, first charge succeeds).
+
+    ```json
+    {
+      "type": "subscription.activated",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "plan_id": "plan_pro_01...",
+        "state": "active",
+        "trial_end": "2026-06-15T00:00:00Z",
+        "first_invoice_id": "inv_01JDEF..."
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.renewed">
+    **Trigger:** A billing cycle completes successfully — card charged or transfer matched.
+
+    ```json
+    {
+      "type": "subscription.renewed",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "plan_id": "plan_pro_01...",
+        "invoice_id": "inv_01JDEF...",
+        "amount_minor": 500000,
+        "period_start": "2026-07-01T00:00:00Z",
+        "period_end": "2026-08-01T00:00:00Z",
+        "next_bill_at": "2026-08-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.past_due">
+    **Trigger:** The first renewal attempt fails. Dunning starts.
+
+    ```json
+    {
+      "type": "subscription.past_due",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "amount_minor": 500000,
+        "decline_code": "insufficient_funds",
+        "decline_type": "soft",
+        "next_retry_at": "2026-07-02T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.grace">
+    **Trigger:** All dunning retries exhausted. Grace period begins.
+
+    ```json
+    {
+      "type": "subscription.grace",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "amount_minor": 500000,
+        "grace_expires_at": "2026-07-22T00:00:00Z",
+        "retries_attempted": 4
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.delinquent">
+    **Trigger:** Grace period expired without payment. Access is revoked.
+
+    ```json
+    {
+      "type": "subscription.delinquent",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "amount_minor": 500000,
+        "days_overdue": 21
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.recovered">
+    **Trigger:** An outstanding invoice is paid (card retry succeeded or bank transfer matched) while the subscription is in `past_due` or `grace`. Access is restored.
+
+    ```json
+    {
+      "type": "subscription.recovered",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "amount_minor": 500000,
+        "recovery_method": "transfer",
+        "days_overdue": 5
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.paused">
+    **Trigger:** Subscription is paused via the API. Billing stops. Access revoked.
+
+    ```json
+    {
+      "type": "subscription.paused",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "paused_at": "2026-06-10T14:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.resumed">
+    **Trigger:** A paused subscription is resumed. Billing restarts.
+
+    ```json
+    {
+      "type": "subscription.resumed",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "resumed_at": "2026-06-15T09:00:00Z",
+        "next_bill_at": "2026-07-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.canceled">
+    **Trigger:** Subscription is canceled (at period end or immediately).
+
+    ```json
+    {
+      "type": "subscription.canceled",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "canceled_at": "2026-07-01T00:00:00Z",
+        "cancellation_type": "period_end"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.upgraded">
+    **Trigger:** Customer's plan is upgraded (move to higher-priced plan).
+
+    ```json
+    {
+      "type": "subscription.upgraded",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "from_plan_id": "plan_pro_01...",
+        "to_plan_id": "plan_max_01...",
+        "proration_invoice_id": "inv_01JGHI...",
+        "charged_minor": 443300,
+        "effective_at": "2026-06-11T10:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.downgraded">
+    **Trigger:** Customer's plan is downgraded (move to lower-priced plan).
+
+    ```json
+    {
+      "type": "subscription.downgraded",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "from_plan_id": "plan_max_01...",
+        "to_plan_id": "plan_pro_01...",
+        "credit_minor": 316700,
+        "effective_at": "2026-07-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.plan_changed">
+    **Trigger:** Plan changed to a plan of equal price (lateral move).
+
+    ```json
+    {
+      "type": "subscription.plan_changed",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "from_plan_id": "plan_pro_annual_01...",
+        "to_plan_id": "plan_pro_monthly_01...",
+        "effective_at": "2026-07-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.plan_change_scheduled">
+    **Trigger:** A plan change is queued for the end of the current period.
+
+    ```json
+    {
+      "type": "subscription.plan_change_scheduled",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "current_plan_id": "plan_max_01...",
+        "new_plan_id": "plan_pro_01...",
+        "scheduled_for": "2026-07-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="subscription.plan_change_canceled">
+    **Trigger:** A scheduled plan change is canceled before it fires.
+
+    ```json
+    {
+      "type": "subscription.plan_change_canceled",
+      "resource_id": "sub_01JABC...",
+      "data": {
+        "subscription_id": "sub_01JABC...",
+        "customer_id": "cus_01JXYZ...",
+        "canceled_plan_id": "plan_pro_01...",
+        "canceled_at": "2026-06-20T11:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Invoice events
+
+<AccordionGroup>
+  <Accordion title="invoice.created">
+    **Trigger:** A new invoice is created (at renewal or from a plan change proration).
+
+    ```json
+    {
+      "type": "invoice.created",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "invoice_id": "inv_01JDEF...",
+        "customer_id": "cus_01JXYZ...",
+        "subscription_id": "sub_01JABC...",
+        "amount_minor": 500000,
+        "state": "open",
+        "period_start": "2026-07-01T00:00:00Z",
+        "period_end": "2026-08-01T00:00:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="invoice.paid">
+    **Trigger:** Invoice is fully paid — card charged or transfer matched in full.
+
+    ```json
+    {
+      "type": "invoice.paid",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "invoice_id": "inv_01JDEF...",
+        "customer_id": "cus_01JXYZ...",
+        "subscription_id": "sub_01JABC...",
+        "amount_minor": 500000,
+        "paid_at": "2026-07-01T00:02:34Z",
+        "payment_method": "card"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="invoice.partially_paid">
+    **Trigger:** A transfer was received but only covers part of the invoice.
+
+    ```json
+    {
+      "type": "invoice.partially_paid",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "invoice_id": "inv_01JDEF...",
+        "customer_id": "cus_01JXYZ...",
+        "amount_minor": 500000,
+        "paid_minor": 400000,
+        "outstanding_minor": 100000
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="invoice.voided">
+    **Trigger:** Invoice is voided (canceled before collection).
+
+    ```json
+    {
+      "type": "invoice.voided",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "invoice_id": "inv_01JDEF...",
+        "customer_id": "cus_01JXYZ...",
+        "voided_at": "2026-06-05T09:00:00Z",
+        "reason": "plan_change"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Transfer events
+
+<AccordionGroup>
+  <Accordion title="transfer.matched">
+    **Trigger:** An inbound bank transfer was matched to an open invoice and paid it in full.
+
+    ```json
+    {
+      "type": "transfer.matched",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "transfer_amount_minor": 500000,
+        "invoice_amount_minor": 500000,
+        "account_number": "0123456789",
+        "received_at": "2026-07-02T09:45:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="transfer.partial">
+    **Trigger:** A transfer arrived for less than the invoice amount. Invoice moves to `partially_paid`.
+
+    ```json
+    {
+      "type": "transfer.partial",
+      "resource_id": "inv_01JDEF...",
+      "data": {
+        "customer_id": "cus_01JXYZ...",
+        "invoice_id": "inv_01JDEF...",
+        "transfer_amount_minor": 400000,
+        "invoice_amount_minor": 500000,
+        "outstanding_minor": 100000,
+        "account_number": "0123456789",
+        "received_at": "2026-07-02T09:45:00Z"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="transfer.suspense">
+    **Trigger:** A transfer arrived from a virtual account but there's no open invoice to match it to.
+
+    ```json
+    {
+      "type": "transfer.suspense",
+      "resource_id": "susp_01JABC...",
+      "data": {
+        "customer_id": "cus_01JXYZ...",
+        "suspense_id": "susp_01JABC...",
+        "transfer_amount_minor": 500000,
+        "account_number": "0123456789",
+        "received_at": "2026-07-02T09:45:00Z",
+        "reason": "no_open_invoice"
+      }
+    }
+    ```
+
+    Resolve via `POST /admin/suspense/:id/resolve`.
+  </Accordion>
+</AccordionGroup>

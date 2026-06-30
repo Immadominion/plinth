@@ -1,0 +1,53 @@
+---
+title: 'How the money flows'
+description: 'From customer to plan to invoice to ledger — the full picture in plain English.'
+---
+
+Here's the mental model. Once it clicks, the API makes sense immediately.
+
+## The flow
+
+```
+Customer
+  └── has a Subscription → Plan (₦5,000/month)
+        └── on renewal → creates Invoice (state: open)
+              ├── card rail → ChargeCard → Invoice (state: paid) → LedgerEntry
+              └── transfer rail → wait for inbound transfer → match → Invoice (state: paid) → LedgerEntry
+```
+
+## The four pieces
+
+**1. The customer** has a balance (a ledger credit). When a customer overpays — sends ₦6,000 on a ₦5,000 invoice, for example — the extra ₦1,000 sits in their balance. Credits apply automatically before we try to charge their card or wait for a transfer. No manual adjustment needed.
+
+**2. The subscription** is the billing relationship. It has a state (`active`, `past_due`, `grace`, etc.) and a `next_bill_at` timestamp. When that timestamp arrives, the billing engine runs. It creates an invoice, then tries to collect.
+
+**3. The invoice** is created at each billing cycle. It records what's owed for that period. It starts in `open` state, moves to `paid` when money clears, or stays `open` while dunning runs. Partial transfers move it to `partially_paid`.
+
+**4. The ledger** is the single source of truth for money movement. Every payment, credit, and refund creates a ledger entry. If you ever need to audit what happened with a customer's money, the ledger tells the full story in chronological order.
+
+<Note>
+All amounts in the API are in **kobo** (1/100th of a Naira). ₦5,000 = 500000 kobo. This avoids floating-point rounding errors entirely — you never deal with decimals.
+</Note>
+
+## Kobo quick reference
+
+| Naira amount | Kobo value |
+|---|---|
+| ₦100 | 10000 |
+| ₦1,000 | 100000 |
+| ₦5,000 | 500000 |
+| ₦12,000 | 1200000 |
+| ₦50,000 | 5000000 |
+
+## Two billing modes
+
+| | Advance billing | Arrears billing |
+|---|---|---|
+| **Invoice created** | At start of period | At end of period |
+| **What it means** | Pay before you use | Pay after you use |
+| **Typical use** | SaaS subscriptions | Usage-based, enterprise contracts |
+| **Default?** | Yes | No — set `billing_mode: "arrears"` |
+
+Advance is the standard SaaS model: customer pays on June 1st for June's access. Arrears is useful for enterprise deals or metered billing: customer uses the service in June, gets invoiced on July 1st.
+
+Both modes produce the same invoice and ledger structure — only the timing differs.

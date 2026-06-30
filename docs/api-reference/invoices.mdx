@@ -1,0 +1,138 @@
+---
+title: 'Invoices'
+description: 'Retrieve invoices and their line items. Invoices are created automatically — you read them, not write them.'
+---
+
+Invoices are created by the billing engine on each renewal. You can retrieve them for auditing, display in a customer portal, or reconciliation. You can't create invoices manually (except via plan changes).
+
+---
+
+## GET /v1/invoices
+
+List invoices. Filter by customer, state, or date range.
+
+<CodeGroup>
+```bash cURL
+curl "https://api.useplinth.com/v1/invoices?customer_id=cus_01JXYZ...&state=paid" \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```typescript Node.js
+const invoices = await client.invoices.list({
+  customerId: 'cus_01JXYZ...',
+  state: 'paid',
+});
+```
+</CodeGroup>
+
+**Query parameters**
+
+<ParamField query="customer_id" type="string">
+  Filter to a specific customer.
+</ParamField>
+
+<ParamField query="subscription_id" type="string">
+  Filter to a specific subscription.
+</ParamField>
+
+<ParamField query="state" type="string">
+  Filter by state: `open`, `paid`, `partially_paid`, `void`.
+</ParamField>
+
+<ParamField query="from" type="string">
+  ISO 8601 start date for `created_at` filter.
+</ParamField>
+
+<ParamField query="to" type="string">
+  ISO 8601 end date for `created_at` filter.
+</ParamField>
+
+<ParamField query="page" type="number">
+  Page number, starting at 1.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Results per page. Default: 20, max: 100.
+</ParamField>
+
+---
+
+## GET /v1/invoices/:id
+
+Retrieve a single invoice.
+
+```bash
+curl https://api.useplinth.com/v1/invoices/inv_01JDEF... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "id": "inv_01JDEF...",
+  "customer_id": "cus_01JXYZ...",
+  "subscription_id": "sub_01JABC...",
+  "state": "paid",
+  "amount_minor": 500000,
+  "paid_minor": 500000,
+  "outstanding_minor": 0,
+  "period_start": "2026-06-01T00:00:00Z",
+  "period_end": "2026-07-01T00:00:00Z",
+  "due_date": "2026-06-01T00:00:00Z",
+  "paid_at": "2026-06-01T00:02:34Z",
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+**Response fields**
+
+<ResponseField name="state" type="string">
+  `open`, `paid`, `partially_paid`, or `void`.
+</ResponseField>
+
+<ResponseField name="amount_minor" type="number">
+  Total amount owed in kobo.
+</ResponseField>
+
+<ResponseField name="paid_minor" type="number">
+  Amount collected so far in kobo.
+</ResponseField>
+
+<ResponseField name="outstanding_minor" type="number">
+  Remaining balance in kobo. `0` when paid in full.
+</ResponseField>
+
+<ResponseField name="period_start" type="string">
+  Start of the billing period this invoice covers.
+</ResponseField>
+
+<ResponseField name="period_end" type="string">
+  End of the billing period.
+</ResponseField>
+
+---
+
+## GET /v1/invoices/:id/line-items
+
+Get the individual charges and credits that make up an invoice.
+
+```bash
+curl https://api.useplinth.com/v1/invoices/inv_01JDEF.../line-items \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "items": [
+    {
+      "id": "li_01JGHI...",
+      "description": "Pro plan — June 2026",
+      "amount_minor": 500000,
+      "type": "subscription",
+      "period_start": "2026-06-01T00:00:00Z",
+      "period_end": "2026-07-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+Proration invoices have multiple line items — one credit and one charge.

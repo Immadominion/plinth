@@ -1,0 +1,68 @@
+---
+title: 'Invoices'
+description: 'An invoice is created on each billing cycle. It records what a customer owes for a period.'
+---
+
+On every billing cycle, the engine creates an invoice for the customer. The invoice captures the period, the amount owed, the payment method attempted, and the final outcome. It's the paper trail for every billing event.
+
+## When invoices are created
+
+- **Subscription renewal** — at `next_bill_at`, a new invoice opens for the next period
+- **Plan change proration** — when a customer upgrades or downgrades mid-cycle, a proration invoice records the adjustment
+- **Manual charge** — if you issue a one-time charge via the API
+
+## Invoice states
+
+| State | What it means |
+|---|---|
+| `open` | Created, not yet paid. We're trying to collect. |
+| `paid` | Fully settled — card charged or transfer matched. |
+| `partially_paid` | A transfer arrived for less than the full amount. Remaining balance is still owed. |
+| `void` | Cancelled before collection. No money moved. |
+
+## Advance vs arrears
+
+**Advance billing** (default): invoice is created at the start of the period. The customer pays for June on June 1st.
+
+**Arrears billing**: invoice is created at the end of the period. The customer uses June's service and gets invoiced on July 1st. Set `billing_mode: "arrears"` when creating a subscription.
+
+| | Advance | Arrears |
+|---|---|---|
+| Invoice created | June 1 (start of period) | July 1 (end of period) |
+| Period covered | June 1 – June 30 | June 1 – June 30 |
+| Due date | June 1 | July 1 |
+| Common use | SaaS subscriptions | Usage-based, enterprise |
+
+## Partial payments
+
+If a customer transfers ₦4,000 on a ₦5,000 invoice (500000 kobo total), the invoice moves to `partially_paid`. The remaining 100000 kobo (₦1,000) stays outstanding. When another transfer arrives from their virtual account, we apply it and close the invoice.
+
+The `transfer.partial` webhook fires when a transfer settles an invoice partially. The `invoice.paid` webhook fires when it's fully settled.
+
+## Retrieve invoices
+
+```bash
+# List invoices for a customer
+curl "https://api.useplinth.com/v1/invoices?customer_id=cus_01JXYZ..." \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+
+# Get a specific invoice
+curl https://api.useplinth.com/v1/invoices/inv_01JDEF... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "id": "inv_01JDEF...",
+  "customer_id": "cus_01JXYZ...",
+  "subscription_id": "sub_01JABC...",
+  "state": "paid",
+  "amount_minor": 500000,
+  "paid_minor": 500000,
+  "outstanding_minor": 0,
+  "period_start": "2026-06-01T00:00:00Z",
+  "period_end": "2026-07-01T00:00:00Z",
+  "paid_at": "2026-06-01T00:02:34Z",
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```

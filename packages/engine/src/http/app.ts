@@ -1,0 +1,75 @@
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import {
+  loggingMiddleware,
+  errorMiddleware,
+  makeAuthMiddleware,
+  idempotencyMiddleware,
+} from './middleware.js';
+import { makeTenantsRouter } from './routes/tenants.js';
+import { makeCustomersRouter } from './routes/customers.js';
+import { makePlanGroupsRouter, makePlansRouter } from './routes/catalog.js';
+import { makeSubscriptionsRouter } from './routes/subscriptions.js';
+import { makeInvoicesRouter } from './routes/invoices.js';
+import { makePolicyRouter } from './routes/policy.js';
+import { makeMeRouter } from './routes/me.js';
+import { makeClockRouter, makeTickRouter, makeSuspenseRouter } from './routes/admin.js';
+import { makeWebhookRouter } from './routes/webhook.js';
+import { makeSandboxRouter } from './routes/sandbox.js';
+import { makeApplicationsPublicRouter, makeApplicationsAdminRouter } from './routes/applications.js';
+import { makeCheckoutRouter } from './routes/checkout.js';
+import { makeAuthRouter } from './routes/auth.js';
+import { makeApiKeysRouter } from './routes/keys.js';
+import { env } from '../config/env.js';
+import type { Container } from './container.js';
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    tenantId: string;
+    tenantName: string;
+    correlationId: string;
+  }
+}
+
+export function buildApp(container: Container): Hono {
+  const app = new Hono();
+
+  app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'] }));
+  app.use('*', loggingMiddleware);
+
+  app.get('/health', (c) => c.json({ status: 'ok', service: 'plinth' }));
+
+  app.route('/sandbox', makeSandboxRouter(container.sandboxService));
+  app.route('/v1/auth', makeAuthRouter(container.authService));
+  app.route('/v1/applications', makeApplicationsPublicRouter(container.applicationService));
+  app.route('/admin/applications', makeApplicationsAdminRouter(container.applicationService, env.ADMIN_SECRET));
+  app.route('/admin/clock', makeClockRouter());
+  app.route('/admin/tick', makeTickRouter(container.tickService, container.tenantRepo, container.clock));
+  app.route('/admin/suspense', makeSuspenseRouter(container.reconService, container.suspenseRepo));
+  app.route('/webhooks', makeWebhookRouter(container.reconService, container.cardTokenService, container.tickService));
+
+  const bootstrapRouter = new Hono();
+  bootstrapRouter.use('*', idempotencyMiddleware);
+  bootstrapRouter.route('/', makeTenantsRouter(container.createTenantService));
+  app.route('/v1/tenants', bootstrapRouter);
+
+  const v1 = new Hono();
+  v1.use('*', makeAuthMiddleware(container.tenantRepo));
+  v1.use('*', idempotencyMiddleware);
+
+  v1.route('/customers',     makeCustomersRouter(container.createCustomerService, container.provisionVaService, container.entitlementsService, container.customerRepo));
+  v1.route('/plan-groups',   makePlanGroupsRouter(container.createPlanGroupService, container.planGroupRepo));
+  v1.route('/plans',         makePlansRouter(container.createPlanService, container.updatePlanService, container.planRepo));
+  v1.route('/subscriptions', makeSubscriptionsRouter(container.createSubscriptionService, container.planChangeService, container.entitlementsService, container.subscriptionRepo));
+  v1.route('/subscriptions', makeCheckoutRouter(container.nomba, container.subscriptionRepo, container.customerRepo, container.planRepo));
+  v1.route('/invoices',     makeInvoicesRouter(container.invoiceRepo));
+  v1.route('/policy',       makePolicyRouter(container.policyService));
+  v1.route('/me',           makeMeRouter(container.tenantRepo));
+  v1.route('/keys',         makeApiKeysRouter(container.tenantRepo, container.clock));
+
+  app.route('/v1', v1);
+
+  app.onError(errorMiddleware);
+
+  return app;
+}

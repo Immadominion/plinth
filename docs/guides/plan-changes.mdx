@@ -1,0 +1,119 @@
+---
+title: 'Upgrade & downgrade with proration'
+description: 'Move a customer between plans mid-cycle. We calculate what they owe (or are owed) to the second.'
+---
+
+When a customer switches plan mid-cycle, we work out the unused portion of their current plan and credit it against the new plan's charge. The maths is per-second — no rounding to days.
+
+## Always preview first
+
+Before committing a plan change, call the preview endpoint. It tells you exactly what will happen: what the customer owes (or gets credited), whether it's immediate or deferred, and a line-item breakdown.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../preview-change \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"new_plan_id": "plan_max_01..."}'
+```
+
+```typescript Node.js
+const preview = await client.subscriptions.previewChange('sub_01JABC...', {
+  newPlanId: 'plan_max_01...',
+});
+```
+</CodeGroup>
+
+```json Response
+{
+  "direction": "upgrade",
+  "current_plan": "Pro",
+  "new_plan": "Max",
+  "due_now_minor": 443300,
+  "credit_minor": 316700,
+  "new_plan_charge_minor": 760000,
+  "scheduled_for": null,
+  "line_items": [
+    {
+      "description": "Unused Pro (19 days remaining)",
+      "amount_minor": -316700,
+      "type": "credit"
+    },
+    {
+      "description": "Max plan (19 days remaining)",
+      "amount_minor": 760000,
+      "type": "charge"
+    }
+  ]
+}
+```
+
+- `direction` — `upgrade`, `downgrade`, or `lateral` (same price, different plan)
+- `due_now_minor` — kobo to charge now (upgrades only)
+- `credit_minor` — kobo credited (downgrades return credit to customer balance)
+- `scheduled_for` — null if immediate, ISO date if deferred to period end
+
+## Commit the change
+
+Once the customer confirms, commit:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../change-plan \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"new_plan_id": "plan_max_01..."}'
+```
+
+```typescript Node.js
+const result = await client.subscriptions.changePlan('sub_01JABC...', {
+  newPlanId: 'plan_max_01...',
+});
+```
+</CodeGroup>
+
+## Strategies
+
+**Immediate prorated (default for upgrades):** Charge or credit now based on the remaining period. The new plan takes effect immediately.
+
+**At period end (default for downgrades):** No charge or credit now. The new plan activates at the next renewal. The current plan runs until then. A `subscription.plan_change_scheduled` event fires.
+
+You can override the strategy:
+
+```json
+{
+  "new_plan_id": "plan_pro_01...",
+  "strategy": "immediate"
+}
+```
+
+Options: `"immediate"` or `"period_end"`.
+
+## Cancel a scheduled change
+
+If the customer changes their mind before the scheduled change fires:
+
+```bash
+curl -X DELETE https://api.useplinth.com/v1/subscriptions/sub_01JABC.../scheduled-change \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+The subscription continues on the current plan. A `subscription.plan_change_canceled` event fires.
+
+## Worked example
+
+Priya is on Pro (₦5,000/month) on **day 11 of a 30-day cycle**. She upgrades to Max (₦12,000/month).
+
+**Unused Pro credit:**
+- Remaining days: 30 − 11 = 19 days
+- ₦5,000 × (19/30) = ₦3,166.67 → **₦3,167** (rounded half-up)
+
+**New Max charge for remaining period:**
+- ₦12,000 × (19/30) = ₦7,600
+
+**Net due now:**
+- ₦7,600 − ₦3,167 = **₦4,433** (443300 kobo)
+
+<Note>
+Rounding uses half-up on kobo values. We never issue negative invoices — if a credit exceeds the new charge (e.g., downgrading to a much cheaper plan mid-cycle), the surplus goes to the customer's balance and offsets their next invoice.
+</Note>

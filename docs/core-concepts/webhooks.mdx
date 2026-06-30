@@ -1,0 +1,88 @@
+---
+title: 'Webhooks & events'
+description: 'We send a webhook every time something important happens — subscription renewed, payment failed, plan changed.'
+---
+
+Poll is slow and misses things. Webhooks are instant. Every state change in the billing engine fires an event to your endpoint — subscriptions renewing, cards failing, transfers matching, grace periods expiring.
+
+## Set up your endpoint
+
+Register a webhook URL in the [dashboard](https://app.useplinth.com/dashboard/webhooks) or via the API:
+
+```bash
+curl -X POST https://api.useplinth.com/v1/webhook-endpoints \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://yourapp.com/webhooks/nomba",
+    "events": ["subscription.renewed", "subscription.past_due", "invoice.paid"]
+  }'
+```
+
+Pass `"events": ["*"]` to receive all event types.
+
+## Signature verification
+
+Every webhook request includes an `X-Nomba-Signature` header. Verify it before processing the payload — this confirms the request came from us, not someone else.
+
+```typescript
+import { constructEvent } from '@nomba/sdk/webhooks';
+import express from 'express';
+
+const app = express();
+
+app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-nomba-signature'] as string;
+
+  let event;
+  try {
+    event = constructEvent(req.body, signature, process.env.NOMBA_WEBHOOK_SECRET!);
+  } catch (err) {
+    // Signature invalid — reject the request
+    return res.status(400).send('Invalid signature');
+  }
+
+  // Safe to process
+  console.log('Received event:', event.type, event.id);
+  res.sendStatus(200);
+});
+```
+
+The `X-Nomba-Signature` is an HMAC-SHA256 of the raw request body, using your webhook secret as the key. Your secret is shown once when you create the endpoint — store it in an environment variable.
+
+## Webhook payload shape
+
+Every event uses the same envelope:
+
+```json
+{
+  "id": "evt_01JXYZ...",
+  "type": "subscription.renewed",
+  "tenant_id": "ten_abc...",
+  "resource_id": "sub_01JABC...",
+  "data": {
+    "subscription_id": "sub_01JABC...",
+    "customer_id": "cus_01JXYZ...",
+    "plan_id": "plan_pro_01...",
+    "invoice_id": "inv_01JDEF...",
+    "amount_minor": 500000,
+    "period_start": "2026-07-01T00:00:00Z",
+    "period_end": "2026-08-01T00:00:00Z"
+  },
+  "occurred_at": "2026-07-01T00:00:01Z"
+}
+```
+
+- `id` — unique event ID. Use it for deduplication.
+- `type` — the event name. See the [full catalog](/webhook-events).
+- `resource_id` — the primary resource affected (subscription, invoice, etc.)
+- `data` — event-specific payload. Shape varies by type.
+- `occurred_at` — when the event happened, in UTC ISO 8601.
+
+<Note>
+We retry failed webhook deliveries up to 5 times with exponential backoff (1s, 5s, 30s, 2min, 10min). Your endpoint should return a `2xx` response within 5 seconds. If it takes longer, return 200 immediately and process async.
+</Note>
+
+## Full event catalog
+
+See [Webhook events](/webhook-events) for every event type, what triggers it, and a full payload example.

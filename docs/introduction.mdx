@@ -1,0 +1,42 @@
+---
+title: 'What is Plinth?'
+description: 'Recurring billing for Nigerian SaaS — card charging, bank transfers, and dunning in one API.'
+---
+
+Plinth handles the parts of SaaS billing that most founders put off until they break: failed payments, proration, bank transfers from enterprise customers, and the awkward emails when someone's card declines.
+
+## Who it's for
+
+A SaaS company selling to Nigerian businesses. You have customers who pay monthly or annually, sometimes by card, often by bank transfer. You want revenue to flow automatically without building a billing engine from scratch.
+
+## What it does
+
+<CardGroup cols={3}>
+  <Card title="Card billing" icon="credit-card">
+    Tokenise a customer's card once via Nomba. We charge it automatically on every renewal — no manual intervention.
+  </Card>
+  <Card title="Transfer matching" icon="building-columns">
+    Every customer gets a dedicated virtual account number. When they send a bank transfer, we match it to their open invoice automatically.
+  </Card>
+  <Card title="Dunning & recovery" icon="rotate">
+    Smart retry schedule, configurable grace periods, payday-aware timing. Recovers revenue you'd otherwise write off.
+  </Card>
+</CardGroup>
+
+## What it doesn't do
+
+It's not a payment processor. Plinth sits on top of Nomba's payment rails — we orchestrate billing, not the underlying money movement. You still need a Nomba account for live payments.
+
+## Quick links
+
+<CardGroup cols={3}>
+  <Card title="5-minute quickstart" icon="bolt" href="/quickstart">
+    Three API calls: create a customer, subscribe them, check their access.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/core-concepts/subscriptions">
+    Understand how customers, plans, subscriptions, and invoices connect.
+  </Card>
+  <Card title="API reference" icon="rectangle-terminal" href="/api-reference/authentication">
+    Full endpoint docs with request/response shapes.
+  </Card>
+</CardGroup>

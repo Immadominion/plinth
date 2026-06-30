@@ -1,0 +1,56 @@
+---
+title: 'Postpaid / Arrears'
+description: 'Bill at the end of the period. For usage-based and enterprise contract billing.'
+---
+
+Postpaid uses arrears billing: customers use your service first, then get invoiced at the end of the period. Combined with a 14-day grace period and lenient dunning, it's designed for enterprise contracts and usage-based SaaS.
+
+## Who should use this
+
+- Usage-based billing (API calls, seats consumed, storage used)
+- Enterprise contracts with net-30 or net-60 payment terms
+- Products where the invoice amount depends on activity during the period
+- SaaS selling to procurement-driven organisations where the purchase order arrives after service delivery
+
+## Settings
+
+| Policy knob | Value | Why |
+|---|---|---|
+| Upgrade strategy | Immediate, prorated | Upgrade takes effect now |
+| Downgrade strategy | At period end | Wait until the period closes |
+| Grace period | 14 days | Enterprise payment cycles are slow — 14 days gives AP teams a realistic window |
+| Dunning retries | 4 (days +1, +3, +7, +14) | Standard retry schedule after invoice is created |
+| Plan changes while `past_due` | Block upgrades | Can't upgrade to a higher tier while the current invoice is unpaid |
+| **Billing mode** | **Arrears** | Invoice created at end of period, not start |
+| Max debt | None | — |
+
+## Apply
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/tenant/apply-preset \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "postpaid"}'
+```
+
+```typescript Node.js
+await client.tenant.applyPreset('postpaid');
+```
+</CodeGroup>
+
+## How arrears changes the timeline
+
+With this preset, a subscription created on June 1st works like this:
+
+```
+June 1: Subscription starts, access granted. No invoice yet.
+July 1: Period ends. Invoice created for June. Collection starts.
+July 15: Grace period expires if unpaid → delinquent.
+```
+
+Compare to advance billing: the invoice would be created and charged on June 1st.
+
+<Note>
+If you're billing based on usage within the period (e.g., ₦50 per API call), you'll report usage via the metering API before the period closes. The invoice amount reflects the reported usage. See the metering docs for details.
+</Note>

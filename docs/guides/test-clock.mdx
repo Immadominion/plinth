@@ -1,0 +1,145 @@
+---
+title: 'Using the test clock'
+description: 'Fast-forward time in your sandbox to test renewals, dunning, and grace periods without waiting.'
+---
+
+In test mode, time is controllable. You can simulate an entire year of billing in seconds.
+
+## Why this exists
+
+No other billing API lets you test dunning recovery or grace period expiry without waiting days. With the test clock, you advance time, trigger the billing tick, and see the result immediately. Testing a full dunning cycle — failed card, 4 retries, grace period, delinquent — takes under 2 minutes.
+
+## Check current simulated time
+
+```bash
+curl https://api.useplinth.com/admin/clock \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "simulated_now": "2026-06-01T00:00:00Z",
+  "real_now": "2026-06-18T10:23:44Z",
+  "offset_seconds": 0
+}
+```
+
+## Advance the clock
+
+```bash
+# Advance 1 month (30 days)
+curl -X POST https://api.useplinth.com/admin/clock/advance \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"seconds": 2592000}'
+```
+
+```json Response
+{
+  "simulated_now": "2026-07-01T00:00:00Z",
+  "advanced_seconds": 2592000
+}
+```
+
+Common durations:
+
+| Duration | Seconds |
+|---|---|
+| 1 day | 86400 |
+| 7 days | 604800 |
+| 14 days | 1209600 |
+| 30 days | 2592000 |
+| 1 year | 31536000 |
+
+## Trigger the billing tick
+
+Advancing the clock alone doesn't bill anyone. You need to run the tick to process renewals, retries, and state transitions at the new simulated time.
+
+```bash
+curl -X POST https://api.useplinth.com/admin/tick \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "processed_subscriptions": 3,
+  "invoices_created": 2,
+  "invoices_paid": 1,
+  "state_transitions": [
+    { "subscription_id": "sub_01JABC...", "from": "active", "to": "past_due" }
+  ]
+}
+```
+
+## Full scenario: simulate a dunning cycle in 2 minutes
+
+<Steps>
+  <Step title="Create a subscription that will fail">
+    ```bash
+    curl -X POST https://api.useplinth.com/v1/subscriptions \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "customer_id": "cus_01JXYZ...",
+        "plan_id": "plan_pro_01...",
+        "payment_method": "card",
+        "payment_method_id": "tok_test_decline"
+      }'
+    ```
+
+    `tok_test_decline` always fails. This lets you simulate dunning without any real card.
+  </Step>
+
+  <Step title="Advance 1 month + tick — subscription goes past_due">
+    ```bash
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -d '{"seconds": 2592000}'
+
+    curl -X POST https://api.useplinth.com/admin/tick \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+    ```
+
+    Check subscription state — it's now `past_due`. The `subscription.past_due` webhook fired.
+  </Step>
+
+  <Step title="Advance 3 days + tick — retry fires (still fails)">
+    ```bash
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -d '{"seconds": 259200}'
+    curl -X POST https://api.useplinth.com/admin/tick
+    ```
+  </Step>
+
+  <Step title="Advance 7 days + tick — retry fires (still fails)">
+    ```bash
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -d '{"seconds": 604800}'
+    curl -X POST https://api.useplinth.com/admin/tick
+    ```
+  </Step>
+
+  <Step title="Advance 14 days + tick — final retry, subscription enters grace">
+    ```bash
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -d '{"seconds": 1209600}'
+    curl -X POST https://api.useplinth.com/admin/tick
+    ```
+
+    Subscription is now `grace`. `subscription.grace` webhook fired. The 7-day grace window is open.
+  </Step>
+
+  <Step title="Advance 8 more days + tick — delinquent">
+    ```bash
+    curl -X POST https://api.useplinth.com/admin/clock/advance \
+      -d '{"seconds": 691200}'
+    curl -X POST https://api.useplinth.com/admin/tick
+    ```
+
+    Subscription is now `delinquent`. `subscription.delinquent` webhook fired. `has_access: false`.
+  </Step>
+</Steps>
+
+<Warning>
+The shared sandbox clock is rate-limited to 1 advance per minute per tenant. If you're running intensive tests (CI pipelines, load tests), request a dedicated sandbox key from support — it has no rate limit.
+</Warning>

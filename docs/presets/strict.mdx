@@ -1,0 +1,48 @@
+---
+title: 'Strict'
+description: 'For services where access and payment are tightly coupled. Short grace, no exceptions.'
+---
+
+Use Strict when access to your service carries real value or risk — content platforms, API services with per-call costs, or anything where giving free access during a payment dispute costs you money.
+
+## Who should use this
+
+- API-first products where unpaid usage has a real cost
+- Content or media platforms (access = direct revenue lost)
+- Services with tight margins where grace periods hurt
+- Products with high fraud or chargebacks where you want fast cutoffs
+
+## Settings
+
+| Policy knob | Value | Why |
+|---|---|---|
+| Upgrade strategy | Immediate, prorated | Charge now, upgrade now |
+| Downgrade strategy | Immediate credit | Credit the unused amount to customer balance immediately |
+| Grace period | 3 days | Short window — clear payment issues fast or lose access |
+| Dunning retries | 4 (days +1, +3, +7, +14) | Standard schedule, but grace kicks in sooner after final retry |
+| Plan changes while `past_due` | Block all changes | No plan adjustments while an invoice is outstanding |
+| Billing mode | Advance | Invoice at start of period |
+| Max debt | 0 | No outstanding balance tolerated beyond grace |
+
+## Apply
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/tenant/apply-preset \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "strict"}'
+```
+
+```typescript Node.js
+await client.tenant.applyPreset('strict');
+```
+</CodeGroup>
+
+<Warning>
+Strict's 3-day grace period is short. Make sure your `subscription.past_due` webhook handler sends an immediate, actionable notification to the customer — they need to know fast. If your notification system is unreliable, consider Lenient or SaaS-Standard instead.
+</Warning>
+
+<Note>
+Immediate downgrades issue a credit to the customer's balance (not a refund to their card). The credit offsets their next invoice automatically.
+</Note>

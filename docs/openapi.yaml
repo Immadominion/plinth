@@ -1,0 +1,1028 @@
+openapi: 3.0.3
+info:
+  title: Plinth API
+  version: 0.9.0
+  description: |
+    Recurring billing for Nigerian SaaS — card charging, bank transfers via virtual accounts,
+    proration, dunning, and recovery in one API.
+
+    All amounts are in **kobo** (1/100th of a Naira). ₦5,000 = `500000`.
+
+servers:
+  - url: https://api.useplinth.com
+    description: Production
+  - url: http://localhost:7331
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Sandbox
+    description: Create an isolated sandbox environment for testing. No auth required.
+  - name: Customers
+    description: Who you are billing. One customer can have multiple subscriptions.
+  - name: Plans
+    description: Plan groups and the plans within them. Customers subscribe to plans.
+  - name: Subscriptions
+    description: The recurring billing relationship between a customer and a plan.
+  - name: Virtual Accounts
+    description: Dedicated bank account numbers for customers who pay by transfer.
+  - name: Invoices
+    description: Created at each billing cycle. Tracks what a customer owes for a period.
+  - name: Admin
+    description: Test clock control, billing tick, and suspense resolution. Test-mode only.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Use `sk_test_` keys for sandbox. Use `sk_live_` keys for production.
+        Obtain your key from the dashboard.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Not found
+        code:
+          type: string
+          example: not_found
+      required: [error]
+
+    Tenant:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [tenant]
+        id:
+          type: string
+          example: ten_01JXYZ...
+        name:
+          type: string
+          example: Acme SaaS Co
+        raw_api_key:
+          type: string
+          description: Only returned on creation. Store it immediately — it cannot be retrieved again.
+          example: sk_test_a1b2c3...
+        key_prefix:
+          type: string
+          example: sk_test_a1b2
+        mode:
+          type: string
+          enum: [test, live]
+        created_at:
+          type: string
+          format: date-time
+
+    Customer:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [customer]
+        id:
+          type: string
+          example: cus_01JABC...
+        external_ref:
+          type: string
+          description: Your own system's user ID. Use this to look up customers by your ID.
+          example: user_12345
+        name:
+          type: string
+          example: Acme Corp
+        created_at:
+          type: string
+          format: date-time
+
+    Entitlements:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [entitlements]
+        subscription_id:
+          type: string
+          nullable: true
+          example: sub_01JABC...
+        state:
+          type: string
+          nullable: true
+          enum: [active, trialing, past_due, grace, delinquent, paused, canceled]
+          example: active
+        has_access:
+          type: boolean
+          description: >
+            True if the customer should have access to paid features.
+            Active, trialing, past_due, and grace all return true.
+          example: true
+        tier:
+          type: string
+          enum: [full, free]
+          example: full
+        features:
+          type: array
+          items:
+            type: string
+          example: []
+
+    PlanGroup:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [plan_group]
+        id:
+          type: string
+          example: pg_01JABC...
+        name:
+          type: string
+          example: Core
+        created_at:
+          type: string
+          format: date-time
+
+    Plan:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [plan]
+        id:
+          type: string
+          example: pln_01JABC...
+        name:
+          type: string
+          example: Pro
+        amount_minor:
+          type: string
+          description: Amount in kobo as a string. ₦5,000 = "500000".
+          example: "500000"
+        created_at:
+          type: string
+          format: date-time
+
+    Subscription:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [subscription]
+        id:
+          type: string
+          example: sub_01JABC...
+        state:
+          type: string
+          enum: [active, trialing, past_due, grace, delinquent, paused, canceled]
+          example: active
+        current_period_start:
+          type: string
+          format: date-time
+        current_period_end:
+          type: string
+          format: date-time
+        trial_end_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_bill_at:
+          type: string
+          format: date-time
+
+    PlanChangePreview:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [preview]
+        direction:
+          type: string
+          enum: [upgrade, downgrade, lateral]
+          example: upgrade
+        dueNowMinor:
+          type: string
+          description: Kobo to charge immediately (upgrade). Zero if deferred.
+          example: "466667"
+        creditMinor:
+          type: string
+          description: Kobo to credit to balance (downgrade). Zero if deferred.
+          example: "0"
+        scheduledFor:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the change is deferred to period end. Null if immediate.
+
+    VirtualAccount:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [virtual_account]
+        id:
+          type: string
+          example: va_01JABC...
+        customer_id:
+          type: string
+          example: cus_01JABC...
+        account_number:
+          type: string
+          example: "9391234567"
+        bank_name:
+          type: string
+          example: Nomba MFB
+        account_name:
+          type: string
+          example: Acme Corp — Plinth
+        account_ref:
+          type: string
+          example: cus_01JABC...
+        created_at:
+          type: string
+          format: date-time
+
+    Invoice:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [invoice]
+        id:
+          type: string
+          example: inv_01JABC...
+        state:
+          type: string
+          enum: [open, paid, partially_paid, void]
+          example: paid
+        amount_minor:
+          type: string
+          description: Total invoice amount in kobo.
+          example: "500000"
+        amount_paid_minor:
+          type: string
+          example: "500000"
+        billing_mode:
+          type: string
+          enum: [advance, arrears]
+          example: advance
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+        due_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ClockState:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [clock_state]
+        mode:
+          type: string
+          enum: [real, test]
+        simulated_now:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SuspenseItem:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [suspense_item]
+        id:
+          type: string
+          example: sus_01JABC...
+        tenant_id:
+          type: string
+        amount_minor:
+          type: string
+          example: "350000"
+        account_ref:
+          type: string
+          example: unknown_ref_xyz
+        narration:
+          type: string
+          example: UNKNOWN TRANSFER
+        reason:
+          type: string
+          enum: [no_va, no_open_invoice, amount_mismatch]
+          example: no_va
+        created_at:
+          type: string
+          format: date-time
+
+    SandboxResult:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [sandbox]
+        tenant_id:
+          type: string
+          example: ten_01JXYZ...
+        api_key:
+          type: string
+          description: Your private API key. Store it — it cannot be retrieved again.
+          example: sk_test_a1b2c3d4e5f6...
+        expires_at:
+          type: string
+          format: date-time
+          description: Sandbox tenants are automatically deleted after 24 hours.
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              amount_minor:
+                type: string
+              currency:
+                type: string
+              interval:
+                type: string
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+
+paths:
+  # ─────────────────────────────────────────────────────────── Sandbox ──────
+  /sandbox/create:
+    post:
+      operationId: create-sandbox
+      summary: Create a sandbox
+      description: >
+        Provisions an isolated sandbox tenant pre-seeded with three plans (Starter, Pro, Max)
+        and one test customer. Returns a private API key. No authentication required.
+        The sandbox expires after 24 hours.
+      tags: [Sandbox]
+      security: []
+      responses:
+        "201":
+          description: Sandbox created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxResult"
+              example:
+                object: sandbox
+                tenant_id: ten_01JXYZ...
+                api_key: sk_test_a1b2c3d4e5f6...
+                expires_at: "2026-06-19T12:00:00Z"
+                plans:
+                  - { id: pln_01JAA..., name: Starter, amount_minor: "200000", currency: NGN, interval: month }
+                  - { id: pln_01JAB..., name: Pro,     amount_minor: "500000", currency: NGN, interval: month }
+                  - { id: pln_01JAC..., name: Max,     amount_minor: "1200000",currency: NGN, interval: month }
+                customer:
+                  id: cus_01JAD...
+                  name: Sandbox Customer
+                  email: customer@sandbox.ng
+
+  # ────────────────────────────────────────────────────────── Customers ─────
+  /v1/customers:
+    post:
+      operationId: create-customer
+      summary: Create a customer
+      description: >
+        Creates a new customer. Set `external_ref` to your own system's user ID
+        so you can look up customers by your ID later.
+      tags: [Customers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_ref, name, email]
+              properties:
+                external_ref:
+                  type: string
+                  maxLength: 200
+                  description: Your internal user ID. Must be unique per tenant.
+                  example: user_12345
+                name:
+                  type: string
+                  maxLength: 200
+                  example: Acme Corp
+                email:
+                  type: string
+                  format: email
+                  example: billing@acme.ng
+                phone:
+                  type: string
+                  maxLength: 20
+                  example: "+2348012345678"
+      responses:
+        "201":
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: external_ref already exists for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/customers/{id}/entitlements:
+    get:
+      operationId: get-customer-entitlements
+      summary: Get customer entitlements
+      description: >
+        Returns whether the customer has access to paid features and at what tier.
+        Use this before serving any feature — don't parse subscription state yourself.
+        Returns `has_access: false` if the customer has no subscription.
+      tags: [Customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cus_01JABC...
+      responses:
+        "200":
+          description: Entitlement status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entitlements"
+              example:
+                object: entitlements
+                subscription_id: sub_01JABC...
+                state: active
+                has_access: true
+                tier: full
+                features: []
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ──────────────────────────────────────────────────────── Virtual Accounts ─
+  /v1/customers/{id}/virtual-account:
+    post:
+      operationId: provision-virtual-account
+      summary: Provision a virtual account
+      description: >
+        Creates a dedicated bank account number (virtual account) for the customer.
+        Transfers sent to this account are automatically matched to open invoices.
+        One virtual account per customer.
+      tags: [Virtual Accounts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cus_01JABC...
+      responses:
+        "201":
+          description: Virtual account provisioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirtualAccount"
+              example:
+                object: virtual_account
+                id: va_01JABC...
+                customer_id: cus_01JABC...
+                account_number: "9391234567"
+                bank_name: Nomba MFB
+                account_name: Acme Corp — Plinth
+                account_ref: cus_01JABC...
+                created_at: "2026-06-01T00:00:00Z"
+        "409":
+          description: Customer already has a virtual account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ──────────────────────────────────────────────────────────── Plans ───────
+  /v1/plan-groups:
+    post:
+      operationId: create-plan-group
+      summary: Create a plan group
+      description: >
+        A plan group is a named collection of plans (e.g., "Core" containing Starter, Pro, Max).
+        Create the group first, then add plans to it.
+      tags: [Plans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Core
+                description:
+                  type: string
+                  maxLength: 500
+                  example: Main product tiers
+      responses:
+        "201":
+          description: Plan group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanGroup"
+
+  /v1/plans:
+    post:
+      operationId: create-plan
+      summary: Create a plan
+      description: >
+        Creates a plan within a plan group. Amount is in kobo. Set `trial_period_days`
+        to give new subscribers a free trial before the first charge.
+      tags: [Plans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_group_id, name, amount_minor, billing_interval]
+              properties:
+                plan_group_id:
+                  type: string
+                  example: pg_01JABC...
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Pro
+                amount_minor:
+                  type: integer
+                  description: Price in kobo. ₦5,000 = 500000.
+                  example: 500000
+                billing_interval:
+                  type: string
+                  enum: [day, week, month, year]
+                  example: month
+                billing_interval_count:
+                  type: integer
+                  default: 1
+                  description: e.g., 3 months = interval "month" + count 3
+                  example: 1
+                trial_period_days:
+                  type: integer
+                  default: 0
+                  example: 14
+      responses:
+        "201":
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+              example:
+                object: plan
+                id: pln_01JABC...
+                name: Pro
+                amount_minor: "500000"
+                created_at: "2026-06-01T00:00:00Z"
+
+  # ──────────────────────────────────────────────────── Subscriptions ───────
+  /v1/subscriptions:
+    post:
+      operationId: create-subscription
+      summary: Create a subscription
+      description: >
+        Subscribes a customer to a plan. If the plan has a trial period, the subscription
+        starts in `trialing` state and the first charge fires at `trial_end_at`.
+        Use `preferred_rail: transfer` for customers who pay by bank transfer.
+      tags: [Subscriptions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, plan_id]
+              properties:
+                customer_id:
+                  type: string
+                  example: cus_01JABC...
+                plan_id:
+                  type: string
+                  example: pln_01JABC...
+                default_payment_method_id:
+                  type: string
+                  description: Card token from Nomba. Required for card-rail subscriptions.
+                  example: tok_test_visa
+                preferred_rail:
+                  type: string
+                  enum: [card, transfer, direct_debit]
+                  default: card
+                  example: card
+                quantity:
+                  type: integer
+                  default: 1
+                  example: 1
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+              example:
+                object: subscription
+                id: sub_01JABC...
+                state: active
+                current_period_start: "2026-06-01T00:00:00Z"
+                current_period_end: "2026-07-01T00:00:00Z"
+                trial_end_at: null
+                next_bill_at: "2026-07-01T00:00:00Z"
+
+  /v1/subscriptions/{id}/status:
+    get:
+      operationId: get-subscription-status
+      summary: Get subscription status
+      description: Returns the current access status for a subscription.
+      tags: [Subscriptions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sub_01JABC...
+      responses:
+        "200":
+          description: Subscription status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entitlements"
+        "404":
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/subscriptions/{id}/preview-change:
+    post:
+      operationId: preview-plan-change
+      summary: Preview a plan change
+      description: >
+        Calculates exactly what a plan change would cost without committing it.
+        Always call this before `change` so the customer sees the exact amount
+        before confirming. Returns proration amounts to the kobo.
+      tags: [Subscriptions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sub_01JABC...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id:
+                  type: string
+                  example: pln_01JABC...
+                quantity:
+                  type: integer
+                  example: 1
+      responses:
+        "200":
+          description: Proration preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanChangePreview"
+              example:
+                object: preview
+                direction: upgrade
+                dueNowMinor: "466667"
+                creditMinor: "0"
+                scheduledFor: null
+
+  /v1/subscriptions/{id}/change:
+    post:
+      operationId: change-plan
+      summary: Change plan
+      description: >
+        Commits a plan change. For upgrades (by default): charges the prorated difference immediately.
+        For downgrades (by default): schedules the change at the next period end — no charge now.
+        This behaviour is controlled by your TenantPolicy preset.
+      tags: [Subscriptions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sub_01JABC...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id:
+                  type: string
+                  example: pln_01JABC...
+                quantity:
+                  type: integer
+                  example: 1
+      responses:
+        "200":
+          description: Plan changed or change scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [subscription]
+                  strategy:
+                    type: string
+                    enum: [immediate_prorated, at_period_end, at_trial_end]
+                  direction:
+                    type: string
+                    enum: [upgrade, downgrade, lateral]
+                  invoice_id:
+                    type: string
+                    nullable: true
+                  amount_charged_minor:
+                    type: string
+                    nullable: true
+                  credit_applied_minor:
+                    type: string
+                    nullable: true
+                  scheduled_for:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /v1/subscriptions/{id}/scheduled-change/{changeId}:
+    delete:
+      operationId: cancel-scheduled-change
+      summary: Cancel a scheduled plan change
+      description: Cancels a pending at-period-end plan change. The subscription stays on the current plan.
+      tags: [Subscriptions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sub_01JABC...
+        - name: changeId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sc_01JABC...
+      responses:
+        "200":
+          description: Scheduled change canceled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [scheduled_change]
+                  id:
+                    type: string
+                  canceled:
+                    type: boolean
+                    example: true
+
+  # ─────────────────────────────────────────────────────────── Admin ────────
+  /admin/clock:
+    get:
+      operationId: get-clock
+      summary: Get current clock state
+      description: Returns the current simulated time (test mode only).
+      tags: [Admin]
+      security: []
+      responses:
+        "200":
+          description: Clock state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClockState"
+              example:
+                object: clock_state
+                mode: test
+                simulated_now: "2026-07-01T00:00:00Z"
+                updated_at: "2026-06-14T10:00:00Z"
+
+  /admin/clock/advance:
+    post:
+      operationId: advance-clock
+      summary: Advance the clock
+      description: >
+        Fast-forwards simulated time by the specified number of seconds.
+        The shared sandbox clock is rate-limited to 1 advance per minute.
+        After advancing, call `POST /admin/tick` to trigger billing.
+      tags: [Admin]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [advanceSeconds]
+              properties:
+                advanceSeconds:
+                  type: integer
+                  description: Seconds to advance. Max 63,072,000 (2 years).
+                  example: 2592000
+      responses:
+        "200":
+          description: Clock advanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClockState"
+
+  /admin/clock/reset:
+    post:
+      operationId: reset-clock
+      summary: Reset the clock to real time
+      description: Switches the clock back to real-time mode.
+      tags: [Admin]
+      security: []
+      responses:
+        "200":
+          description: Clock reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClockState"
+
+  /admin/tick:
+    post:
+      operationId: run-tick
+      summary: Run the billing tick
+      description: >
+        Processes all subscriptions due for billing, trials ending, dunning retries,
+        grace period checks, and expired sandbox cleanup.
+        Must include `tenant_id` as a query parameter.
+      tags: [Admin]
+      security: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: ten_01JXYZ...
+      responses:
+        "200":
+          description: Tick result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [tick_result]
+                  renewed:
+                    type: integer
+                    example: 3
+                  trials_converted:
+                    type: integer
+                    example: 1
+                  failed:
+                    type: integer
+                    example: 0
+                  sandboxes_purged:
+                    type: integer
+                    example: 0
+
+  /admin/suspense:
+    get:
+      operationId: list-suspense
+      summary: List suspense items
+      description: >
+        Returns unresolved inbound transfers that couldn't be matched to a customer
+        or open invoice. Resolve them manually or wait for the customer to contact you.
+      tags: [Admin]
+      security: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of suspense items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [list]
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SuspenseItem"
+
+  /admin/suspense/{id}/resolve:
+    post:
+      operationId: resolve-suspense
+      summary: Resolve a suspense item
+      description: Marks a suspense transfer as manually resolved with an audit note.
+      tags: [Admin]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sus_01JABC...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note:
+                  type: string
+                  example: "Matched manually to customer cus_01JABC. Credited their balance."
+      responses:
+        "200":
+          description: Suspense item resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [suspense_item]
+                  id:
+                    type: string
+                  resolved:
+                    type: boolean
+                    example: true

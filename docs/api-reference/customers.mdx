@@ -1,0 +1,151 @@
+---
+title: 'Customers'
+description: 'Create and manage the businesses or people you are billing.'
+---
+
+## POST /v1/customers
+
+Create a new customer.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/customers \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Paystack Inc",
+    "email": "billing@paystack.com",
+    "phone": "+2348012345678",
+    "external_ref": "usr_1234"
+  }'
+```
+
+```typescript Node.js
+const customer = await client.customers.create({
+  name: 'Paystack Inc',
+  email: 'billing@paystack.com',
+  phone: '+2348012345678',
+  externalRef: 'usr_1234',
+});
+```
+</CodeGroup>
+
+**Request body**
+
+<ParamField body="name" type="string" required>
+  The customer's display name. Used in invoices and dashboard.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address. Used for invoice delivery and communications.
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Phone number in international format (e.g., `+2348012345678`).
+</ParamField>
+
+<ParamField body="external_ref" type="string">
+  Your internal user or account ID. Set this to look up customers by your own ID rather than ours. Must be unique within your tenant.
+</ParamField>
+
+**Response**
+
+<ResponseField name="id" type="string">
+  Unique customer ID. Format: `cus_01...`
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Customer's display name.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Customer's email.
+</ResponseField>
+
+<ResponseField name="external_ref" type="string">
+  Your internal reference, if provided.
+</ResponseField>
+
+<ResponseField name="balance_minor" type="number">
+  Customer's credit balance in kobo. Applied automatically at next billing.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp.
+</ResponseField>
+
+---
+
+## GET /v1/customers
+
+List customers with optional filtering.
+
+```bash
+curl "https://api.useplinth.com/v1/customers?external_ref=usr_1234" \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+**Query parameters**
+
+<ParamField query="external_ref" type="string">
+  Filter by your internal reference.
+</ParamField>
+
+<ParamField query="page" type="number">
+  Page number, starting at 1. Default: 1.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Results per page. Default: 20, max: 100.
+</ParamField>
+
+---
+
+## GET /v1/customers/:id
+
+Retrieve a customer by their Nomba ID.
+
+```bash
+curl https://api.useplinth.com/v1/customers/cus_01JXYZ... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+---
+
+## GET /v1/customers/:id/entitlements
+
+Check whether a customer has access and what tier they're on.
+
+```bash
+curl https://api.useplinth.com/v1/customers/cus_01JXYZ.../entitlements \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+Use this before serving any paid feature. It gives you a single yes/no answer — don't parse subscription state yourself.
+
+**Response**
+
+<ResponseField name="has_access" type="boolean">
+  `true` if the customer has active access. `false` if they're delinquent, canceled, or paused.
+</ResponseField>
+
+<ResponseField name="tier" type="string">
+  The access tier. Values: `full`, `grace`, `none`. `grace` means they're in a past_due or grace state but still allowed through.
+</ResponseField>
+
+<ResponseField name="subscription_state" type="string">
+  The underlying subscription state: `active`, `trialing`, `past_due`, `grace`, `delinquent`, `paused`, `canceled`.
+</ResponseField>
+
+<ResponseField name="plan" type="string">
+  The plan name (e.g., `"Pro"`).
+</ResponseField>
+
+```json Response
+{
+  "has_access": true,
+  "tier": "full",
+  "subscription_state": "active",
+  "plan": "Pro"
+}
+```

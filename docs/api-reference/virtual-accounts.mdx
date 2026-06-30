@@ -1,0 +1,91 @@
+---
+title: 'Virtual accounts'
+description: 'Provision dedicated bank account numbers for customers who pay by transfer.'
+---
+
+Every customer can have a dedicated virtual account — a real bank account number that routes to Nomba's reconciliation layer. Transfers to this number are automatically matched to the customer's open invoices.
+
+See the [transfer billing guide](/guides/transfer-billing) for the full setup walkthrough, including the Bob scenario.
+
+---
+
+## POST /v1/customers/:id/virtual-account
+
+Provision a virtual account for a customer. Each customer can have one virtual account. Calling this twice returns the same account.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/customers/cus_01JXYZ.../virtual-account \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```typescript Node.js
+const va = await client.customers.provisionVirtualAccount('cus_01JXYZ...');
+```
+</CodeGroup>
+
+**Response**
+
+<ResponseField name="account_number" type="string">
+  The 10-digit NUBAN account number. Customers send transfers here.
+</ResponseField>
+
+<ResponseField name="bank_name" type="string">
+  The bank holding the virtual account (e.g., `"Nomba MFB"`).
+</ResponseField>
+
+<ResponseField name="account_name" type="string">
+  Account name shown on the transfer confirmation screen (e.g., `"ACME CORP / NOMBA SUBS"`).
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  The customer this account belongs to.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp.
+</ResponseField>
+
+```json Response
+{
+  "account_number": "0123456789",
+  "bank_name": "Nomba MFB",
+  "account_name": "ACME CORP / NOMBA SUBS",
+  "customer_id": "cus_01JXYZ...",
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+---
+
+## GET /v1/customers/:id/virtual-account
+
+Retrieve the virtual account details for a customer.
+
+<CodeGroup>
+```bash cURL
+curl https://api.useplinth.com/v1/customers/cus_01JXYZ.../virtual-account \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```typescript Node.js
+const va = await client.customers.getVirtualAccount('cus_01JXYZ...');
+```
+</CodeGroup>
+
+Returns the same response shape as provisioning. Returns `404` if no virtual account has been provisioned yet.
+
+---
+
+## How matching works
+
+When a transfer arrives at the virtual account:
+
+1. Nomba identifies the account → routes to the customer
+2. We find the customer's oldest open invoice
+3. If the transfer amount matches the invoice exactly → invoice marked `paid`
+4. If the transfer is less than the invoice → invoice moves to `partially_paid`, remaining balance stays open
+5. If the transfer is more than the invoice → invoice marked `paid`, surplus credited to customer balance
+6. If there's no open invoice → transfer goes to suspense queue
+
+Webhooks fire for each case: `transfer.matched`, `transfer.partial`, `transfer.suspense`.

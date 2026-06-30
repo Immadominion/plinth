@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Test & coverage
+coverage/
+*.js.map
+
+# DB / migrations scratch
+.drizzle/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Next.js
+next-env.d.ts
+
+# pnpm
+.pnpm-debug.log*
+
+# Misc local notes
+d-docs/
+mds/

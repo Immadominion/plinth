@@ -1,0 +1,98 @@
+---
+title: 'Failed payments: dunning → grace → recovery'
+description: 'What happens when a card declines, and how we recover the revenue.'
+---
+
+A card declining doesn't mean you've lost the customer. Most are fixable — wrong expiry date, temporary hold, card replaced. Plinth has a built-in retry engine with a payday-aware schedule that recovers revenue you'd otherwise write off.
+
+## The timeline
+
+<Steps>
+  <Step title="Renewal attempt fails">
+    The billing engine tries to charge the card at `next_bill_at`. The card declines.
+
+    - Subscription moves to `past_due`
+    - Invoice stays `open`
+    - `subscription.past_due` webhook fires
+    - Customer still has access — don't cut them off yet
+  </Step>
+
+  <Step title="Retry day +1">
+    We try again 24 hours later. If it succeeds: `subscription.recovered`, `invoice.paid`, access continues as normal.
+
+    If it fails: we move to the next retry.
+  </Step>
+
+  <Step title="Retry day +3">
+    Third attempt, 3 days after the original failure.
+  </Step>
+
+  <Step title="Retry day +7 (payday-aware)">
+    Fourth attempt. If day +7 falls after the 25th of the month, we move this retry to the 25th instead — the most common salary/payroll date in Nigeria. Higher probability of funds being available.
+  </Step>
+
+  <Step title="Retry day +14">
+    Final attempt. If this fails, the subscription moves to `grace`.
+
+    - `subscription.grace` webhook fires
+    - Customer still has access during grace (default 7 days, configurable)
+  </Step>
+
+  <Step title="Grace period expires">
+    If the invoice isn't paid before the grace period ends:
+
+    - Subscription moves to `delinquent`
+    - `subscription.delinquent` webhook fires
+    - **Access is cut off** — `has_access: false` from the entitlements endpoint
+  </Step>
+</Steps>
+
+## Soft vs hard declines
+
+We classify decline codes into two categories:
+
+| Type | What it means | Our response |
+|---|---|---|
+| **Soft decline** | Temporary issue — insufficient funds, daily limit reached, temporary hold | Retry on schedule |
+| **Hard decline** | Permanent issue — stolen card, account closed, invalid card number | Skip straight to `grace`. Retrying is pointless and may upset the cardholder. |
+
+Common hard codes: `do_not_honor`, `stolen_card`, `lost_card`, `account_closed`, `invalid_account`.
+
+Common soft codes: `insufficient_funds`, `withdrawal_limit_exceeded`, `try_again_later`.
+
+## Recovery via bank transfer
+
+During `past_due` or `grace`, the customer can pay the outstanding invoice by bank transfer to their virtual account — even if they're on a card subscription. We auto-reconcile it and restore access immediately. No manual intervention needed on your end.
+
+`subscription.recovered` fires as soon as the transfer is matched.
+
+## Webhooks to handle
+
+| Event | What to do in your app |
+|---|---|
+| `subscription.past_due` | Show an in-app banner: "Your payment failed. Please update your card." |
+| `subscription.recovered` | Clear the banner, restore any restricted features |
+| `subscription.grace` | Show a stronger warning: "X days left to resolve payment or access will be cut" |
+| `subscription.delinquent` | Revoke access. Show a blocked screen with payment instructions. |
+
+## What to do in your app
+
+**On `subscription.past_due`:**
+- Show a non-blocking warning banner
+- Send a payment failure email with a link to update their card
+- Don't block features yet — most cards recover within a retry
+
+**On `subscription.grace`:**
+- Show a countdown: "Your account will be suspended in N days"
+- Send escalating emails (day 1, day 5, day 7 of grace)
+- Optionally block non-critical features to create urgency
+
+**On `subscription.delinquent`:**
+- Block access to paid features
+- Redirect to a payment recovery page showing their VA account details or a card update link
+- Keep their data — don't delete anything. They might pay tomorrow.
+
+**On `subscription.recovered`:**
+- Restore access immediately
+- Send a "welcome back" confirmation email
+- Clear any warning states in your UI

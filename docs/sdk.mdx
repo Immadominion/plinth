@@ -1,0 +1,143 @@
+---
+title: 'Node.js SDK'
+description: 'A thin, typed wrapper around the REST API. Install it and you have types for everything.'
+---
+
+The SDK wraps every API endpoint and gives you full TypeScript types — request bodies, response shapes, and event payloads. It's built on `fetch`, has no heavyweight dependencies, and works in Node.js 18+.
+
+## Install
+
+```bash
+npm install @nomba/sdk
+```
+
+## Initialise
+
+```typescript
+import { Plinth } from '@nomba/sdk';
+
+const client = new Plinth({
+  apiKey: process.env.NOMBA_API_KEY!,
+});
+```
+
+Pass `apiKey` explicitly or set `NOMBA_API_KEY` as an environment variable — the SDK picks it up automatically if you don't pass it.
+
+## Resources
+
+Every API resource maps to a method on the client:
+
+### `client.customers`
+
+```typescript
+client.customers.create(body)              // POST /v1/customers
+client.customers.get(id)                   // GET /v1/customers/:id
+client.customers.list(params?)             // GET /v1/customers
+client.customers.entitlements(id)          // GET /v1/customers/:id/entitlements
+client.customers.provisionVirtualAccount(id)  // POST /v1/customers/:id/virtual-account
+client.customers.getVirtualAccount(id)        // GET /v1/customers/:id/virtual-account
+```
+
+### `client.subscriptions`
+
+```typescript
+client.subscriptions.create(body, opts?)   // POST /v1/subscriptions
+client.subscriptions.get(id)               // GET /v1/subscriptions/:id
+client.subscriptions.status(id)            // GET /v1/subscriptions/:id/status
+client.subscriptions.cancel(id, body?)     // POST /v1/subscriptions/:id/cancel
+client.subscriptions.pause(id)             // POST /v1/subscriptions/:id/pause
+client.subscriptions.resume(id)            // POST /v1/subscriptions/:id/resume
+client.subscriptions.previewChange(id, body)   // POST /v1/subscriptions/:id/preview-change
+client.subscriptions.changePlan(id, body)      // POST /v1/subscriptions/:id/change-plan
+client.subscriptions.cancelScheduledChange(id) // DELETE /v1/subscriptions/:id/scheduled-change
+```
+
+### `client.plans`
+
+```typescript
+client.planGroups.create(body)             // POST /v1/plan-groups
+client.planGroups.createPlan(groupId, body) // POST /v1/plan-groups/:id/plans
+client.plans.list(params?)                 // GET /v1/plans
+```
+
+### `client.invoices`
+
+```typescript
+client.invoices.list(params?)              // GET /v1/invoices
+client.invoices.get(id)                    // GET /v1/invoices/:id
+client.invoices.lineItems(id)              // GET /v1/invoices/:id/line-items
+```
+
+## Webhook handler
+
+```typescript
+import { constructEvent } from '@nomba/sdk/webhooks';
+import express from 'express';
+
+const app = express();
+
+app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), async (req, res) => {
+  const event = constructEvent(
+    req.body,
+    req.headers['x-nomba-signature'] as string,
+    process.env.NOMBA_WEBHOOK_SECRET!
+  );
+
+  switch (event.type) {
+    case 'subscription.renewed':
+      // event.data is fully typed — TypeScript knows the shape
+      await grantFullAccess(event.data.customer_id);
+      break;
+
+    case 'subscription.past_due':
+      await showPaymentWarning(event.data.customer_id);
+      break;
+
+    case 'subscription.delinquent':
+      await revokeAccess(event.data.customer_id);
+      break;
+
+    case 'transfer.matched':
+      console.log(`Transfer matched for customer ${event.data.customer_id}`);
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+`constructEvent` throws `NombaSignatureError` if the signature doesn't match. Always handle that case.
+
+## Error handling
+
+The SDK throws typed errors for every failure case:
+
+```typescript
+import { NombaApiError, NombaSignatureError } from '@nomba/sdk';
+
+try {
+  const customer = await client.customers.get('cus_invalid...');
+} catch (err) {
+  if (err instanceof NombaApiError) {
+    console.error(err.status);   // e.g., 404
+    console.error(err.message);  // "Customer not found"
+    console.error(err.code);     // "not_found"
+  }
+}
+```
+
+`NombaApiError` covers all HTTP errors (4xx, 5xx). `NombaSignatureError` covers invalid webhook signatures.
+
+## Idempotency keys
+
+Pass an idempotency key in options to safely retry:
+
+```typescript
+const subscription = await client.subscriptions.create(body, {
+  idempotencyKey: `sub-${customerId}-${planId}-${Date.now()}`,
+});
+```
+
+<Note>
+A Python SDK is in progress. In the meantime, the REST API works with any HTTP client — see the curl examples throughout the docs.
+</Note>

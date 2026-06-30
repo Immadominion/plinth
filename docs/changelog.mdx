@@ -1,0 +1,22 @@
+---
+title: 'Changelog'
+description: 'What changed and when.'
+---
+
+## v0.9.0 — June 2026
+
+- **Arrears billing mode** — set `billing_mode: "arrears"` on a subscription to invoice at end of period instead of start. Useful for usage-based and enterprise contract billing.
+- **Entitlements API** — `GET /v1/customers/:id/entitlements` returns a single `has_access` boolean, `tier`, and `subscription_state`. No more parsing state machines in your app.
+- **Postpaid / Arrears preset** — a new billing preset combining arrears mode, 14-day grace, and lenient dunning. Apply with `preset: "postpaid"`.
+- **Debt cap** (`max_debt_minor`) — a new TenantPolicy knob that caps how much outstanding balance a customer can accumulate before access is cut, regardless of grace settings.
+
+---
+
+## v0.8.0 — May 2026
+
+- **Virtual account provisioning** — `POST /v1/customers/:id/virtual-account` gives each customer a dedicated NUBAN account number at Nomba MFB.
+- **Inbound transfer reconciliation** — exact match, partial payment, overpayment (surplus to balance), and suspense queue for unmatched transfers. Webhooks for each case: `transfer.matched`, `transfer.partial`, `transfer.suspense`.
+- **Dunning engine** — built-in retry schedule (days +1, +3, +7, +14) with payday-aware adjustment. Hard decline codes skip straight to grace. Configurable via TenantPolicy.
+- **Five billing presets** — SaaS-Standard, Lenient, Strict, Transfer-First, Postpaid. Apply with `POST /v1/tenant/apply-preset`.
+- **Plan change with proration** — `POST /v1/subscriptions/:id/preview-change` shows the maths before you commit. Per-second kobo proration with half-up rounding. Immediate or deferred strategies.
+- **Grace period tracking** — `grace_expires_at` field on subscription status. `subscription.grace` event fires when grace begins.

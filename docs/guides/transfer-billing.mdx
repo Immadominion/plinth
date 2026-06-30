@@ -1,0 +1,154 @@
+---
+title: 'Transfer billing (virtual account setup)'
+description: 'For customers who prefer to pay by bank transfer. Every customer gets a dedicated account number.'
+---
+
+Bank transfers are how Nigerian corporate finance teams operate. They don't swipe cards — they log into their banking app, initiate a transfer, and attach a reference. Transfer billing handles this automatically: every customer gets a dedicated account number, and any transfer to that account is matched to their open invoice.
+
+## The Bob scenario
+
+Imagine Bob runs a 50-person logistics company. He signs up for your ₦12,000/month Max plan but his finance team doesn't do card payments — they do bank transfers from their corporate account. Here's how you handle Bob.
+
+<Steps>
+  <Step title="Create Bob as a customer">
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/v1/customers \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Gokada Logistics",
+        "email": "finance@gokada.ng",
+        "external_ref": "usr_bob_7721"
+      }'
+    ```
+
+    ```typescript Node.js
+    const customer = await client.customers.create({
+      name: 'Gokada Logistics',
+      email: 'finance@gokada.ng',
+      externalRef: 'usr_bob_7721',
+    });
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Provision a virtual account">
+    Give Bob a dedicated bank account number. Transfers to this account will be matched to his invoices automatically.
+
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/v1/customers/cus_bob.../virtual-account \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+    ```
+
+    ```typescript Node.js
+    const va = await client.customers.provisionVirtualAccount('cus_bob...');
+    ```
+    </CodeGroup>
+
+    ```json Response
+    {
+      "account_number": "0123456789",
+      "bank_name": "Nomba MFB",
+      "account_name": "GOKADA LOGISTICS / NOMBA SUBS",
+      "customer_id": "cus_bob...",
+      "created_at": "2026-06-01T00:00:00Z"
+    }
+    ```
+
+    This account number is Bob's forever. Every transfer he sends to it will be matched to his account — even if his invoice changes or he changes plans.
+  </Step>
+
+  <Step title="Show Bob his account details">
+    Display the account number and bank name in your customer portal or email. Bob's finance team sends their transfers here.
+
+    ```
+    Pay to:
+    Bank: Nomba MFB
+    Account: 0123456789
+    Name: GOKADA LOGISTICS / NOMBA SUBS
+    ```
+
+    No reference number needed — the dedicated account handles matching.
+  </Step>
+
+  <Step title="Create the subscription on transfer rail">
+    <CodeGroup>
+    ```bash cURL
+    curl -X POST https://api.useplinth.com/v1/subscriptions \
+      -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "customer_id": "cus_bob...",
+        "plan_id": "plan_max_01...",
+        "payment_method": "transfer"
+      }'
+    ```
+
+    ```typescript Node.js
+    const subscription = await client.subscriptions.create({
+      customerId: 'cus_bob...',
+      planId: 'plan_max_01...',
+      paymentMethod: 'transfer',
+    });
+    ```
+    </CodeGroup>
+
+    ```json Response
+    {
+      "id": "sub_bob_01...",
+      "state": "active",
+      "payment_method": "transfer",
+      "next_bill_at": "2026-07-01T00:00:00Z"
+    }
+    ```
+
+    On a transfer subscription, `next_bill_at` is when we open the invoice and start waiting. No card is charged.
+  </Step>
+
+  <Step title="Bob pays — we match automatically">
+    Bob's finance team sends ₦12,000 (1200000 kobo) to account `0123456789` at Nomba MFB.
+
+    Nomba sees the inbound transfer → matches it to Bob's open invoice → marks the invoice `paid` → subscription renews.
+
+    You receive:
+    - `transfer.matched` — transfer received and matched
+    - `invoice.paid` — invoice settled
+    - `subscription.renewed` — billing period advanced
+
+    ```typescript
+    case 'subscription.renewed':
+      await grantAccess(event.data.customer_id);
+      console.log('Bob paid. Access extended to', event.data.period_end);
+      break;
+    ```
+  </Step>
+
+  <Step title="If Bob pays the wrong amount">
+    **Underpayment (₦11,000 on a ₦12,000 invoice):**
+
+    The invoice moves to `partially_paid`. Bob still owes ₦1,000 (100000 kobo). The `transfer.partial` webhook fires. His subscription stays `active` — access isn't cut — but the open balance stays on his account. The next transfer from his virtual account clears it.
+
+    ```json transfer.partial payload
+    {
+      "type": "transfer.partial",
+      "data": {
+        "customer_id": "cus_bob...",
+        "invoice_id": "inv_bob_01...",
+        "transfer_amount_minor": 1100000,
+        "invoice_amount_minor": 1200000,
+        "outstanding_minor": 100000
+      }
+    }
+    ```
+
+    **Overpayment (₦13,000 on a ₦12,000 invoice):**
+
+    Invoice is marked `paid`. The extra ₦1,000 goes to Bob's customer balance. It offsets his next invoice automatically.
+
+    **Unknown transfer (no open invoice):**
+
+    If a transfer arrives and there's no open invoice — maybe Bob paid early — it goes into suspense. You resolve it via `POST /admin/suspense/:id/resolve`. See the [admin API](/api-reference/admin).
+  </Step>
+</Steps>

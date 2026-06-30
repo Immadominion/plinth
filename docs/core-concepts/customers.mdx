@@ -1,0 +1,106 @@
+---
+title: 'Customers'
+description: 'A customer is who you are billing. One customer can have multiple subscriptions.'
+---
+
+A customer represents a business or person you're billing. They have a name, an email, an optional phone number, and a ledger balance. Most operations in the API — creating subscriptions, checking access, reviewing invoices — start with a customer.
+
+## The `external_ref` field
+
+This is your own system's user ID. Set it when you create the customer so you can look them up by your ID, not ours.
+
+```json
+{
+  "name": "Flutterwave Ltd",
+  "email": "finance@flutterwave.com",
+  "external_ref": "usr_8847"
+}
+```
+
+Then retrieve them later: `GET /v1/customers?external_ref=usr_8847`.
+
+Without `external_ref`, you'd have to store our `id` (`cus_01JXYZ...`) in your database separately. Setting it means you never need to.
+
+## The customer balance
+
+Customers have a ledger balance in kobo. It starts at zero.
+
+The balance increases when:
+- A customer overpays an invoice (e.g., transfers ₦6,000 on a ₦5,000 invoice)
+- You issue a manual credit
+- A downgrade proration results in a credit
+
+The balance decreases when:
+- It offsets the next invoice (applied automatically before charging the card or waiting for transfer)
+
+You don't need to manage this manually. At billing time, we apply the balance first, then charge for the remainder.
+
+## Create a customer
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/customers \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Paystack Inc",
+    "email": "billing@paystack.com",
+    "phone": "+2348012345678",
+    "external_ref": "usr_1234"
+  }'
+```
+
+```typescript Node.js
+const customer = await client.customers.create({
+  name: 'Paystack Inc',
+  email: 'billing@paystack.com',
+  phone: '+2348012345678',
+  externalRef: 'usr_1234',
+});
+```
+</CodeGroup>
+
+```json Response
+{
+  "id": "cus_01JXYZ...",
+  "name": "Paystack Inc",
+  "email": "billing@paystack.com",
+  "phone": "+2348012345678",
+  "external_ref": "usr_1234",
+  "balance_minor": 0,
+  "created_at": "2026-06-01T00:00:00Z"
+}
+```
+
+## Retrieve by external ref
+
+```bash
+curl "https://api.useplinth.com/v1/customers?external_ref=usr_1234" \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+Returns a paginated list. If you always use unique `external_ref` values, it returns exactly one customer.
+
+## Check entitlements
+
+Before serving any feature, check if the customer has access. Don't parse subscription state yourself.
+
+```bash
+curl https://api.useplinth.com/v1/customers/cus_01JXYZ.../entitlements \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "has_access": true,
+  "tier": "full",
+  "subscription_state": "active",
+  "plan": "Pro"
+}
+```
+
+`has_access: false` means cut them off. `tier` tells you what features to show (if you have feature gating by plan). `subscription_state` tells you why — `past_due` means their card is failing, `delinquent` means grace expired.
+
+<Note>
+A customer without a subscription still exists. You might create them at sign-up and subscribe them later — after a trial sign-up flow, for example.
+</Note>

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Plinth",
+  "logo": {
+    "dark": "/logo/logo.svg",
+    "light": "/logo/logo.svg"
+  },
+  "favicon": "/logo/logo.svg",
+  "colors": {
+    "primary": "#4f46e5",
+    "light": "#818cf8",
+    "dark": "#3730a3",
+    "anchors": {
+      "from": "#4f46e5",
+      "to": "#818cf8"
+    }
+  },
+  "topbarLinks": [
+    { "name": "Dashboard", "url": "https://app.useplinth.com/dashboard" }
+  ],
+  "topbarCtaButton": {
+    "name": "Get API key",
+    "url": "https://app.useplinth.com/login"
+  },
+  "primaryTab": {
+    "name": "Documentation"
+  },
+  "tabs": [
+    { "name": "API Reference", "url": "api-reference" },
+    { "name": "Presets", "url": "presets" },
+    { "name": "SDK", "url": "sdk" }
+  ],
+  "anchors": [
+    {
+      "name": "API Reference",
+      "icon": "rectangle-terminal",
+      "url": "api-reference"
+    },
+    {
+      "name": "Changelog",
+      "icon": "list",
+      "url": "changelog"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart", "sandbox", "how-money-flows"]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "core-concepts/tenants",
+        "core-concepts/customers",
+        "core-concepts/plans",
+        "core-concepts/subscriptions",
+        "core-concepts/invoices",
+        "core-concepts/webhooks"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/card-billing",
+        "guides/transfer-billing",
+        "guides/plan-changes",
+        "guides/dunning",
+        "guides/arrears-billing",
+        "guides/test-clock"
+      ]
+    },
+    {
+      "group": "Presets",
+      "pages": [
+        "presets/overview",
+        "presets/saas-standard",
+        "presets/lenient",
+        "presets/strict",
+        "presets/transfer-first",
+        "presets/postpaid"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/authentication",
+        {
+          "group": "Sandbox",
+          "pages": ["api-reference/create-sandbox"]
+        },
+        {
+          "group": "Customers",
+          "pages": [
+            "api-reference/create-customer",
+            "api-reference/get-customer-entitlements",
+            "api-reference/provision-virtual-account"
+          ]
+        },
+        {
+          "group": "Plans",
+          "pages": [
+            "api-reference/create-plan-group",
+            "api-reference/create-plan"
+          ]
+        },
+        {
+          "group": "Subscriptions",
+          "pages": [
+            "api-reference/create-subscription",
+            "api-reference/get-subscription-status",
+            "api-reference/preview-plan-change",
+            "api-reference/change-plan",
+            "api-reference/cancel-scheduled-change"
+          ]
+        },
+        {
+          "group": "Admin",
+          "pages": [
+            "api-reference/get-clock",
+            "api-reference/advance-clock",
+            "api-reference/reset-clock",
+            "api-reference/run-tick",
+            "api-reference/list-suspense",
+            "api-reference/resolve-suspense"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": ["webhook-events", "sdk", "changelog"]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/nomba_ng",
+    "github": "https://github.com/nomba"
+  },
+  "openapi": "/openapi.yaml",
+  "custom": ["/sandbox-switcher.js"],
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  }
+}
