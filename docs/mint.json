@@ -100,7 +100,10 @@
           "group": "Plans",
           "pages": [
             "api-reference/create-plan-group",
-            "api-reference/create-plan"
+            "api-reference/create-plan",
+            "api-reference/list-plans",
+            "api-reference/update-plan",
+            "api-reference/delete-plan"
           ]
         },
         {

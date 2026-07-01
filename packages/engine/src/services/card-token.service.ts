@@ -7,7 +7,7 @@ import type { CustomerRepo } from '../db/customer.repo.js';
 
 /**
  * Handles card tokenization from Nomba payment_success webhooks.
- * orderReference convention: plinth_{tenantId}_{customerId}
+ * orderReference convention: plinth_{subId}  (e.g. plinth_sub_01XXX — 35 chars, ≤ Nomba's 50 limit)
  */
 export class CardTokenizationService {
   constructor(
@@ -15,18 +15,25 @@ export class CardTokenizationService {
     private readonly customerRepo: CustomerRepo,
   ) {}
 
+  // Parse orderReference → subId → { tenantId, customerId, subscriptionId }. Used by card, transfer, and change paths.
+  async resolveFromOrderRef(orderReference: string): Promise<{ tenantId: string; customerId: string; subscriptionId: string } | null> {
+    if (!orderReference.startsWith('plinth_')) return null;
+
+    // Format: plinth_{subId}_{6-char-suffix}  e.g. plinth_sub_01XXX_AB1C23
+    const withoutPrefix = orderReference.slice('plinth_'.length);
+    const lastUnder = withoutPrefix.lastIndexOf('_');
+    const subId = lastUnder > 3 ? withoutPrefix.slice(0, lastUnder) : withoutPrefix;
+
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subId)).limit(1);
+    if (!sub) return null;
+    return { tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id };
+  }
+
   async handleTokenized(orderReference: string, tokenKey: string): Promise<{ tenantId: string; customerId: string } | null> {
-    // Parse tenantId and customerId from: plinth_{tenantId}_{cus_XXXXX}
-    const lastUnder = orderReference.lastIndexOf('_cus_');
-    if (!orderReference.startsWith('plinth_') || lastUnder === -1) return null;
+    const resolved = await this.resolveFromOrderRef(orderReference);
+    if (!resolved) return null;
 
-    const tenantId  = orderReference.slice('plinth_'.length, lastUnder);
-    const customerId = orderReference.slice(lastUnder + 1); // includes "cus_..."
-
-    if (!tenantId || !customerId) return null;
-
-    const customer = await this.customerRepo.findById(tenantId, customerId);
-    if (!customer) return null;
+    const { tenantId, customerId } = resolved;
 
     const now = new Date();
 

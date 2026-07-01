@@ -57,34 +57,38 @@ export class CreateSubscriptionService {
     const policy = await this.policyRepo.findByTenantId(input.tenantId);
     const billingMode = input.billingMode ?? policy.billingMode;
 
+    const strict = policy.activationStrategy === 'charge_to_activate';
+
     let trialEndAt: Date | null = null;
-    let currentPeriodStart: Date;
+    let currentPeriodStart: Date = now;
     let currentPeriodEnd: Date;
     let state: SubscriptionState;
+    let nextBillAt: Date;
 
-    if (hasTrial) {
-      // Trial always grants trial access; the activation strategy is applied when the trial ends.
+    if (hasTrial && strict) {
+      // Card-required trial (Netflix-style): no access until the card is captured. The sub
+      // starts `incomplete`; the tokenization webhook starts the trial once the card lands.
+      state = 'incomplete';
+      currentPeriodEnd = now;    // placeholder until activation
+      nextBillAt = now;          // "due" = capture the card now (at checkout)
+    } else if (hasTrial) {
+      // Optimistic trial: access granted immediately; card collected via checkout.
       state = 'trialing';
       trialEndAt = addDays(now, plan.trialPeriodDays);
-      currentPeriodStart = now;
       currentPeriodEnd = trialEndAt;
+      nextBillAt = trialEndAt;
     } else {
-      currentPeriodStart = now;
       currentPeriodEnd = addInterval(now, plan.billingInterval, plan.billingIntervalCount);
       if (billingMode === 'arrears') {
-        // Arrears: use now, pay at the end of the period — no upfront charge, access granted.
+        // Arrears: pay at the end of the period — no upfront charge, access granted.
         state = 'active';
+        nextBillAt = currentPeriodEnd;
       } else {
         // Advance: honour the activation strategy.
-        //  - charge_to_activate (strict): incomplete (no access) until the first payment clears.
-        //  - activate_then_charge (optimistic): grant access now; first payment via checkout.
-        state = policy.activationStrategy === 'charge_to_activate' ? 'incomplete' : 'active';
+        state = strict ? 'incomplete' : 'active';
+        nextBillAt = state === 'incomplete' ? now : currentPeriodEnd;
       }
     }
-
-    // Incomplete (strict) → first payment due immediately (at checkout); otherwise bill at the
-    // period boundary (trial end, or end of period 1 for both advance-renewal and arrears).
-    const nextBillAt = hasTrial ? trialEndAt! : (state === 'incomplete' ? now : currentPeriodEnd);
 
     const subscription: Subscription = {
       id:                     subId,

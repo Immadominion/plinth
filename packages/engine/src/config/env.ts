@@ -9,6 +9,7 @@ const EnvSchema = z.object({
   NOMBA_CLIENT_ID: z.string().optional(),
   NOMBA_CLIENT_SECRET: z.string().optional(),
   NOMBA_ACCOUNT_ID: z.string().optional(),
+  NOMBA_SUB_ACCOUNT_ID: z.string().optional(),
   NOMBA_BASE_URL: z.string().url().default('https://sandbox.nomba.com'),
   NOMBA_WEBHOOK_SECRET: z.string().optional(),
 

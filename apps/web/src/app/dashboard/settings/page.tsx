@@ -72,6 +72,25 @@ export default function SettingsPage() {
     setKeys((prev) => prev.map((k) => k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k));
   }
 
+  // Rotate = create a fresh key (same mode) and revoke the old one. The new full key is
+  // shown once in the banner — copy it before leaving the page.
+  async function rotateKey(k: ApiKey) {
+    if (!confirm('Rotate this key? A new key is created and this one is revoked immediately.')) return;
+    setCreating(true);
+    try {
+      const res = await api.keys.create(k.mode as 'live' | 'test');
+      setNewKey(res.api_key);
+      await api.keys.revoke(k.id);
+      const now = new Date().toISOString();
+      setKeys((prev) => [
+        { id: res.id, prefix: res.prefix, mode: k.mode, created_at: now, revoked_at: null },
+        ...prev.map((x) => (x.id === k.id ? { ...x, revoked_at: now } : x)),
+      ]);
+    } catch {} finally {
+      setCreating(false);
+    }
+  }
+
   function copyNewKey() {
     if (!newKey) return;
     navigator.clipboard.writeText(newKey);
@@ -136,18 +155,15 @@ export default function SettingsPage() {
 
                 <Card>
                   <CardHeader><CardTitle>API Keys</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Live Key</label>
-                      <div className="flex items-center gap-2">
-                        <Input value="sk_live_••••••••••••••••" readOnly className="font-mono bg-gray-50 dark:bg-slate-800" />
-                        <Button variant="outline" size="sm">Rotate</Button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Test Key</label>
-                      <Input value="sk_test_DOCS_SHARED_KEY" readOnly className="font-mono bg-gray-50 dark:bg-slate-800 text-xs" />
-                    </div>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                      Create and manage your API keys in the <span className="font-medium text-gray-700 dark:text-slate-200">API Keys</span> tab.
+                      For security, a key&apos;s full value is shown <span className="font-medium text-gray-700 dark:text-slate-200">only once</span> when
+                      you create it — afterwards only its prefix is visible.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab('apikeys')}>
+                      Manage API keys
+                    </Button>
                   </CardContent>
                 </Card>
 
@@ -224,9 +240,14 @@ export default function SettingsPage() {
                               </div>
                             </div>
                             {!k.revoked_at && (
-                              <button onClick={() => revokeKey(k.id)} className="text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
-                                <Trash2 size={14} />
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button onClick={() => rotateKey(k)} disabled={creating} className="text-xs font-medium text-gray-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 disabled:opacity-50">
+                                  Rotate
+                                </button>
+                                <button onClick={() => revokeKey(k.id)} title="Revoke" className="text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             )}
                           </div>
                         ))}

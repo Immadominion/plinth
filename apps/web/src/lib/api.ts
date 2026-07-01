@@ -61,6 +61,7 @@ export const api = {
     list:   ()            => request('/v1/plans'),
     create: (data: unknown) => request('/v1/plans', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: unknown) => request(`/v1/plans/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    remove: (id: string) => request<{ archived: boolean; deleted: boolean }>(`/v1/plans/${id}`, { method: 'DELETE' }),
   },
   invoices: {
     list:   ()            => request('/v1/invoices'),

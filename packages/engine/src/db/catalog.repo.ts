@@ -30,6 +30,7 @@ export interface Plan {
   billingInterval: BillingInterval;
   billingIntervalCount: number;
   trialPeriodDays: number;
+  lookupKey: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -47,6 +48,7 @@ export interface PlanRepo {
   findEntitlementsByPlan(tenantId: string, planId: string): Promise<Entitlement[]>;
   create(plan: Plan, tx?: TxContext): Promise<void>;
   update(plan: Plan, tx: TxContext): Promise<void>;
+  delete(tenantId: string, planId: string, tx?: TxContext): Promise<void>;
 }
 
 type PlanGroupRow = typeof planGroups.$inferSelect;
@@ -74,6 +76,7 @@ function toPlanDomain(row: PlanRow): Plan {
     billingInterval:      row.billingInterval,
     billingIntervalCount: row.billingIntervalCount,
     trialPeriodDays:      row.trialPeriodDays,
+    lookupKey:            row.lookupKey ?? null,
     active:               row.active,
     createdAt:            row.createdAt,
     updatedAt:            row.updatedAt,
@@ -150,6 +153,7 @@ export class DrizzlePlanRepo implements PlanRepo {
       billingInterval:      plan.billingInterval,
       billingIntervalCount: plan.billingIntervalCount,
       trialPeriodDays:      plan.trialPeriodDays,
+      lookupKey:            plan.lookupKey,
       active:               plan.active,
       createdAt:            plan.createdAt,
       updatedAt:            plan.updatedAt,
@@ -174,9 +178,18 @@ export class DrizzlePlanRepo implements PlanRepo {
         billingInterval:      plan.billingInterval,
         billingIntervalCount: plan.billingIntervalCount,
         trialPeriodDays:      plan.trialPeriodDays,
+        lookupKey:            plan.lookupKey,
         active:               plan.active,
         updatedAt:            plan.updatedAt,
       })
       .where(and(eq(plans.tenantId, plan.tenantId), eq(plans.id, plan.id)));
+  }
+
+  // Hard-delete a plan and its entitlements. Callers must ensure no subscriptions
+  // reference it (use archive — active=false — otherwise).
+  async delete(tenantId: string, planId: string, tx?: TxContext): Promise<void> {
+    const client = getClient(tx);
+    await client.delete(entitlements).where(and(eq(entitlements.tenantId, tenantId), eq(entitlements.planId, planId)));
+    await client.delete(plans).where(and(eq(plans.tenantId, tenantId), eq(plans.id, planId)));
   }
 }

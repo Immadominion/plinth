@@ -37,6 +37,16 @@ export interface CommitChangeResult {
   scheduledFor: string | null;
 }
 
+export interface CheckoutChangeResult {
+  subscriptionId: string;
+  newPlanId: string;
+  newQuantity: number;
+  direction: string;
+  dueMinor: string;
+  oldPlanName: string;
+  newPlanName: string;
+}
+
 export class PlanChangeService {
   constructor(
     private readonly subscriptionRepo: SubscriptionRepo,
@@ -185,7 +195,7 @@ export class PlanChangeService {
       await this.uow.run(async (tx) => {
         await this.scheduledChangeRepo.create({
           id: changeId, tenantId, subscriptionId: sub.id,
-          newPlanId, newQuantity, scheduledFor: sub.currentPeriodEnd, createdAt: now,
+          newPlanId, newQuantity, applyOn: 'period_end', scheduledFor: sub.currentPeriodEnd, dueMinor: null, createdAt: now,
         }, tx);
         await this.eventRepo.append({
           id: `evt_${ulid()}`, tenantId, type: 'subscription.plan_change_scheduled',
@@ -257,6 +267,118 @@ export class PlanChangeService {
       });
       return { subscriptionId: sub.id, planId: newPlanId, quantity: newQuantity, strategy: 'immediate_prorated', direction: 'lateral', invoiceId: null, amountChargedMinor: null, creditAppliedMinor: null, scheduledFor: null };
     }
+  }
+
+  // No-card upgrade path: instead of charging a stored card token, record the intended change as
+  // "apply when this checkout payment settles" (apply_on='payment') and return the amount to collect
+  // via a Nomba-hosted checkout. Only meaningful when the change costs money now (upgrade, net > 0).
+  async beginCheckoutChange(params: {
+    tenantId: string;
+    subscriptionId: string;
+    newPlanId: string;
+    newQuantity?: number;
+  }): Promise<CheckoutChangeResult> {
+    const { tenantId, subscriptionId, newPlanId } = params;
+    const now = this.clock.now();
+
+    const sub = await this.subscriptionRepo.findById(tenantId, subscriptionId);
+    if (!sub) throw new NotFoundError('Subscription', subscriptionId);
+
+    const [oldPlan, newPlan, policy] = await Promise.all([
+      this.planRepo.findById(tenantId, sub.planId),
+      this.planRepo.findById(tenantId, newPlanId),
+      this.policyRepo.findByTenantId(tenantId),
+    ]);
+    if (!oldPlan) throw new NotFoundError('Plan', sub.planId);
+    if (!newPlan) throw new NotFoundError('Plan', newPlanId);
+
+    if (sub.state === 'trialing') {
+      throw new InvalidRequestError('no_payment_required', 'Trial plan changes take effect at trial end with no charge — use /change.');
+    }
+
+    const newQuantity = params.newQuantity ?? sub.quantity;
+    const proration = computeProration({
+      oldAmountMinor: oldPlan.amountMinor, newAmountMinor: newPlan.amountMinor,
+      oldQuantity: sub.quantity, newQuantity,
+      periodStart: sub.currentPeriodStart, periodEnd: sub.currentPeriodEnd, now,
+    });
+
+    // Same dunning gate as commitChange
+    if (DUNNING_STATES.includes(sub.state)) {
+      if (proration.direction === 'upgrade' && policy.changeDuringDunning === 'gate_upgrades') {
+        throw new InvalidRequestError('change_blocked_dunning', `Cannot upgrade while subscription is ${sub.state}. Settle the outstanding balance first.`);
+      }
+      if (policy.changeDuringDunning === 'block_all') {
+        throw new InvalidRequestError('change_blocked_dunning', `Plan changes are blocked while subscription is ${sub.state}.`);
+      }
+    }
+
+    if (proration.netMinor <= 0n) {
+      // Lateral or downgrade — nothing to collect now, so no checkout is needed.
+      throw new InvalidRequestError('no_payment_required', 'This change requires no payment now — use /change instead.');
+    }
+
+    // Record the pending change; it stays inert until the payment webhook calls applyPaidChange.
+    // onConflict (unique per sub) means a fresh attempt overwrites any prior pending change.
+    const changeId = `scc_${ulid()}`;
+    await this.scheduledChangeRepo.create({
+      id: changeId, tenantId, subscriptionId: sub.id,
+      newPlanId, newQuantity, applyOn: 'payment', scheduledFor: null, dueMinor: proration.netMinor, createdAt: now,
+    });
+
+    return {
+      subscriptionId: sub.id, newPlanId, newQuantity,
+      direction: proration.direction, dueMinor: proration.netMinor.toString(),
+      oldPlanName: oldPlan.name, newPlanName: newPlan.name,
+    };
+  }
+
+  // Called by the payment webhook when a checkout for a pending plan change settles. Swaps the plan
+  // and records the proration as a paid invoice for the amount that was quoted at checkout time.
+  // Idempotent: the pending row is deleted on apply, so a duplicate webhook is a no-op (returns false).
+  async applyPaidChange(params: { tenantId: string; subscriptionId: string }): Promise<boolean> {
+    const { tenantId, subscriptionId } = params;
+    const now = this.clock.now();
+
+    const pending = await this.scheduledChangeRepo.findPendingPaymentBySub(tenantId, subscriptionId);
+    if (!pending) return false;
+
+    const sub = await this.subscriptionRepo.findById(tenantId, subscriptionId);
+    if (!sub) return false;
+
+    const [oldPlan, newPlan] = await Promise.all([
+      this.planRepo.findById(tenantId, sub.planId),
+      this.planRepo.findById(tenantId, pending.newPlanId),
+    ]);
+    if (!oldPlan || !newPlan) return false;
+
+    const amount = pending.dueMinor ?? 0n;
+    const invoiceId = `inv_${ulid()}`;
+
+    await this.uow.run(async (tx) => {
+      const locked = await this.subscriptionRepo.findForUpdate(tenantId, sub.id, tx);
+      if (!locked) return;
+      await this.invoiceRepo.create({
+        id: invoiceId, tenantId, customerId: sub.customerId, subscriptionId: sub.id,
+        state: 'paid', currency: 'NGN',
+        amountDueMinor: amount, amountPaidMinor: amount,
+        periodStart: now, periodEnd: locked.currentPeriodEnd,
+        dueAt: now, billingMode: 'advance', isReceivable: false, closedAt: now,
+        createdAt: now, updatedAt: now,
+      }, tx);
+      await this.invoiceRepo.createLineItems([{
+        id: `ili_${ulid()}`, tenantId, invoiceId,
+        description: `Plan upgrade: ${oldPlan.name} → ${newPlan.name}`, amountMinor: amount,
+        quantity: 1, type: 'proration' as const, createdAt: now,
+      }], tx);
+      await this.subscriptionRepo.update({ ...locked, planId: pending.newPlanId, quantity: pending.newQuantity, updatedAt: now }, tx);
+      await this.postLedgerEntry.executeInTx({ tenantId, customerId: sub.customerId, type: 'payment_received', amountMinor: amount, invoiceId, description: `Proration charge (checkout): ${oldPlan.name} → ${newPlan.name}` }, tx);
+      await this.eventRepo.append({ id: `evt_${ulid()}`, tenantId, type: 'subscription.upgraded', resourceType: 'subscription', resourceId: sub.id, payload: { subscriptionId: sub.id, fromPlanId: sub.planId, toPlanId: pending.newPlanId, invoiceId, amountMinor: amount.toString(), via: 'checkout' }, occurredAt: now, createdAt: now }, tx);
+      await this.eventRepo.append({ id: `evt_${ulid()}`, tenantId, type: 'invoice.paid', resourceType: 'invoice', resourceId: invoiceId, payload: { invoiceId, subscriptionId: sub.id, amountMinor: amount.toString() }, occurredAt: now, createdAt: now }, tx);
+      await this.scheduledChangeRepo.delete(tenantId, pending.id, tx);
+    });
+
+    return true;
   }
 
   async cancelScheduledChange(params: {

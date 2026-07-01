@@ -3,6 +3,15 @@ title: 'Changelog'
 description: 'What changed and when.'
 ---
 
+## v0.10.0 — July 2026
+
+- **Plan `lookup_key` (required)** — every plan now carries a stable handle (e.g. `pro_monthly`) you reference instead of its UUID. `GET /v1/plans` returns it; unique per tenant. Your app no longer hardcodes environment-specific plan ids.
+- **Price immutability guardrail** — `PATCH /v1/plans/:id` now rejects `amount_minor` / interval changes once a plan has subscribers (`400 plan_immutable`), preventing accidental silent re-pricing. Name, lookup_key, trial days, and archive status stay editable.
+- **Archive-or-delete** — `DELETE /v1/plans/:id` archives a plan that has subscribers (`active: false` — existing subscribers keep billing, history preserved) and hard-deletes one that was never subscribed. The response tells you which happened.
+- **Active-only plan list** — `GET /v1/plans` returns active plans by default; pass `include_archived=true` to include archived ones.
+
+---
+
 ## v0.9.0 — June 2026
 
 - **Arrears billing mode** — set `billing_mode: "arrears"` on a subscription to invoice at end of period instead of start. Useful for usage-based and enterprise contract billing.

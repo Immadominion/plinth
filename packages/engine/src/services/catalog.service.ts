@@ -3,9 +3,10 @@ import type { Clock } from '../adapters/clock.js';
 import type { UnitOfWork } from '../db/unit-of-work.js';
 import type { PlanGroupRepo, PlanGroup } from '../db/catalog.repo.js';
 import type { PlanRepo, Plan } from '../db/catalog.repo.js';
+import type { SubscriptionRepo } from '../db/subscription.repo.js';
 import type { Kobo } from '../domain/money.js';
 import type { BillingInterval } from '../domain/period.js';
-import { NotFoundError } from '../domain/errors.js';
+import { NotFoundError, PlanImmutableError } from '../domain/errors.js';
 import { assertNonNegative } from '../domain/money.js';
 
 export interface CreatePlanGroupInput {
@@ -56,6 +57,7 @@ export interface CreatePlanInput {
   billingInterval: BillingInterval;
   billingIntervalCount?: number;
   trialPeriodDays?: number;
+  lookupKey: string;
 }
 
 export interface CreatePlanResult {
@@ -92,6 +94,7 @@ export class CreatePlanService {
       billingInterval:      input.billingInterval,
       billingIntervalCount: input.billingIntervalCount ?? 1,
       trialPeriodDays:      input.trialPeriodDays ?? 0,
+      lookupKey:            input.lookupKey,
       active:               true,
       createdAt:            now,
       updatedAt:            now,
@@ -113,12 +116,14 @@ export interface UpdatePlanInput {
   billingInterval?: BillingInterval | undefined;
   billingIntervalCount?: number | undefined;
   trialPeriodDays?: number | undefined;
+  lookupKey?: string | null | undefined;
   active?: boolean | undefined;
 }
 
 export class UpdatePlanService {
   constructor(
     private readonly planRepo: PlanRepo,
+    private readonly subscriptionRepo: SubscriptionRepo,
     private readonly uow: UnitOfWork,
     private readonly clock: Clock,
   ) {}
@@ -128,6 +133,17 @@ export class UpdatePlanService {
     if (!existing) throw new NotFoundError('Plan', input.planId);
     if (input.amountMinor !== undefined) assertNonNegative(input.amountMinor, 'plan.amountMinor');
 
+    // Price/interval are immutable once a plan has subscribers — changing them would
+    // silently re-price everyone at their next renewal. Create a new plan and migrate instead.
+    const changesAmount = input.amountMinor !== undefined && input.amountMinor !== existing.amountMinor;
+    const changesInterval =
+      (input.billingInterval !== undefined && input.billingInterval !== existing.billingInterval) ||
+      (input.billingIntervalCount !== undefined && input.billingIntervalCount !== existing.billingIntervalCount);
+    if (changesAmount || changesInterval) {
+      const subs = await this.subscriptionRepo.countByPlan(input.tenantId, input.planId);
+      if (subs > 0) throw new PlanImmutableError(changesAmount ? 'amount' : 'billing interval');
+    }
+
     const updated: Plan = {
       ...existing,
       name:                 input.name ?? existing.name,
@@ -135,6 +151,7 @@ export class UpdatePlanService {
       billingInterval:      input.billingInterval ?? existing.billingInterval,
       billingIntervalCount: input.billingIntervalCount ?? existing.billingIntervalCount,
       trialPeriodDays:      input.trialPeriodDays ?? existing.trialPeriodDays,
+      lookupKey:            input.lookupKey !== undefined ? input.lookupKey : existing.lookupKey,
       active:               input.active ?? existing.active,
       updatedAt:            this.clock.now(),
     };
@@ -144,5 +161,42 @@ export class UpdatePlanService {
     });
 
     return updated;
+  }
+}
+
+export interface DeletePlanResult {
+  planId: string;
+  /** true = archived (subscribers exist); false = hard-deleted (was unused) */
+  archived: boolean;
+}
+
+// "Delete" is archive-by-default: a plan that has subscriptions is archived (active=false)
+// so existing subscribers keep billing and history stays intact; only a never-subscribed
+// plan is hard-deleted.
+export class DeletePlanService {
+  constructor(
+    private readonly planRepo: PlanRepo,
+    private readonly subscriptionRepo: SubscriptionRepo,
+    private readonly uow: UnitOfWork,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(input: { tenantId: string; planId: string }): Promise<DeletePlanResult> {
+    const existing = await this.planRepo.findById(input.tenantId, input.planId);
+    if (!existing) throw new NotFoundError('Plan', input.planId);
+
+    const subs = await this.subscriptionRepo.countByPlan(input.tenantId, input.planId);
+
+    if (subs > 0) {
+      await this.uow.run(async (tx) => {
+        await this.planRepo.update({ ...existing, active: false, updatedAt: this.clock.now() }, tx);
+      });
+      return { planId: input.planId, archived: true };
+    }
+
+    await this.uow.run(async (tx) => {
+      await this.planRepo.delete(input.tenantId, input.planId, tx);
+    });
+    return { planId: input.planId, archived: false };
   }
 }

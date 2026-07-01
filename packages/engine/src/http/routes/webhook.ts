@@ -4,6 +4,8 @@ import { verifyNombaSignature } from '../../webhook/sign-payload.js';
 import type { TransferReconService } from '../../services/transfer-recon.service.js';
 import type { CardTokenizationService } from '../../services/card-token.service.js';
 import type { TickService } from '../../services/billing.service.js';
+import type { PlanChangeService } from '../../services/plan-change.service.js';
+import type { NombaAdapter } from '../../adapters/nomba.js';
 import { env } from '../../config/env.js';
 
 // Real Nomba webhook payload shape
@@ -37,6 +39,8 @@ export function makeWebhookRouter(
   reconService: TransferReconService,
   cardTokenService: CardTokenizationService,
   tickService: TickService,
+  planChangeService: PlanChangeService,
+  nomba: NombaAdapter,
 ): Hono {
   const router = new Hono();
 
@@ -52,7 +56,10 @@ export function makeWebhookRouter(
     // Observability: log every inbound webhook so we can inspect real payload shapes
     console.log('[webhook:nomba] inbound', JSON.stringify({ sig: sig.slice(0, 16), body: rawBody.slice(0, 1000) }));
 
-    // Cert: HMAC-SHA256(rawBody, secret).hex — verify before parsing
+    // If Nomba sends a signature, verify it (HMAC-SHA256 of the raw body). In practice the
+    // production payment_success webhook arrives UNSIGNED and thin — so we don't reject when
+    // there's no signature; instead, checkout events are re-verified against Nomba's transaction
+    // API below (see lookupOrder), which is the real authenticity anchor and can't be forged.
     if (sig && secret) {
       if (!verifyNombaSignature(secret, sig, rawBody)) {
         return c.json({ error: 'invalid signature' }, 401);
@@ -86,15 +93,28 @@ export function makeWebhookRouter(
       });
     }
 
-    // Card tokenized — store token, wire to subscriptions, and activate any incomplete (strict)
-    // subscriptions now that the checkout payment has been collected (no second charge).
-    if (data.tokenizedCardData?.tokenKey) {
-      const linked = await cardTokenService.handleTokenized(
-        tx.orderReference,
-        data.tokenizedCardData.tokenKey,
-      );
-      if (linked) {
-        await tickService.activateFromPayment(linked.tenantId, linked.customerId);
+    // Checkout payment settled (card or bank transfer). The webhook body is thin and unsigned,
+    // so we CONFIRM with Nomba's transaction lookup before acting — that re-fetch is the
+    // authenticity anchor (a forged webhook just makes us query the real, unpaid order).
+    // activateFromPayment is idempotent, so the duplicate delivery is harmless.
+    if (tx.orderReference?.startsWith('plinth_')) {
+      const verified = await nomba.lookupOrder(tx.orderReference);
+      if (verified.found && verified.settled) {
+        // Card path: capture the token (from the webhook, else from the looked-up order). Transfer has none.
+        const tokenKey = data.tokenizedCardData?.tokenKey ?? verified.cardToken;
+        if (tokenKey) await cardTokenService.handleTokenized(tx.orderReference, tokenKey);
+
+        const linked = await cardTokenService.resolveFromOrderRef(tx.orderReference);
+        if (linked) {
+          // A checkout can settle for one of two reasons: (1) it funds a pending plan change
+          // (no-card upgrade) → swap the plan, or (2) it's the first payment on an incomplete
+          // subscription → activate it. applyPaidChange returns false when there's no pending
+          // change, so we fall through to activation. Both are idempotent for duplicate deliveries.
+          const applied = await planChangeService.applyPaidChange({ tenantId: linked.tenantId, subscriptionId: linked.subscriptionId });
+          if (!applied) await tickService.activateFromPayment(linked.tenantId, linked.customerId);
+        }
+      } else {
+        console.log('[webhook:nomba] order not settled per Nomba lookup — skipping', tx.orderReference, verified.status);
       }
     }
 

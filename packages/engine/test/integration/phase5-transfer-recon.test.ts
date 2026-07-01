@@ -12,6 +12,7 @@ import { DrizzleVirtualAccountRepo } from '../../src/db/virtual-account.repo.js'
 import { DrizzleInboundTransferRepo } from '../../src/db/inbound-transfer.repo.js';
 import { DrizzleSuspenseRepo } from '../../src/db/suspense.repo.js';
 import { DrizzleScheduledChangeRepo } from '../../src/db/scheduled-change.repo.js';
+import { DrizzleTenantPolicyRepo } from '../../src/db/policy.repo.js';
 import { FakeNombaAdapter } from '../../src/adapters/nomba.js';
 import { CreateTenantService } from '../../src/services/tenant.service.js';
 import { CreateCustomerService } from '../../src/services/customer.service.js';
@@ -47,6 +48,7 @@ describe('Phase 5: transfer reconciliation', () => {
   const inboundRepo = new DrizzleInboundTransferRepo();
   const suspenseRepo = new DrizzleSuspenseRepo();
   const scheduledChangeRepo = new DrizzleScheduledChangeRepo();
+  const policyRepo = new DrizzleTenantPolicyRepo();
   const nomba = new FakeNombaAdapter();
 
   const createTenantSvc = new CreateTenantService(tenantRepo, uow, clock);
@@ -54,7 +56,7 @@ describe('Phase 5: transfer reconciliation', () => {
   const createPlanGroupSvc = new CreatePlanGroupService(planGroupRepo, uow, clock);
   const createPlanSvc = new CreatePlanService(planGroupRepo, planRepo, uow, clock);
   const createSubscriptionSvc = new CreateSubscriptionService(
-    customerRepo, planRepo, subscriptionRepo, eventRepo, uow, clock,
+    customerRepo, planRepo, subscriptionRepo, eventRepo, policyRepo, uow, clock,
   );
   const postLedgerEntry = new PostLedgerEntryService(customerRepo, ledgerRepo, uow, clock);
   const chargeCard = new ChargeCardService(nomba);
@@ -82,6 +84,7 @@ describe('Phase 5: transfer reconciliation', () => {
       name:            'Monthly ₦5k',
       amountMinor:     PLAN_AMOUNT,
       billingInterval: 'month',
+      lookupKey:       'monthly_5k',
     });
     planId = plan.planId;
 

@@ -7,7 +7,11 @@ export class InMemoryScheduledChangeRepo implements ScheduledChangeRepo {
   all(): ScheduledChange[] { return [...this.store.values()]; }
 
   async findBySubscription(_tenantId: string, subscriptionId: string, _tx?: TxContext): Promise<ScheduledChange | null> {
-    return [...this.store.values()].find((c) => c.subscriptionId === subscriptionId) ?? null;
+    return [...this.store.values()].find((c) => c.subscriptionId === subscriptionId && (c.applyOn ?? 'period_end') === 'period_end') ?? null;
+  }
+
+  async findPendingPaymentBySub(_tenantId: string, subscriptionId: string, _tx?: TxContext): Promise<ScheduledChange | null> {
+    return [...this.store.values()].find((c) => c.subscriptionId === subscriptionId && c.applyOn === 'payment') ?? null;
   }
 
   async create(change: ScheduledChange, _tx?: TxContext): Promise<void> {

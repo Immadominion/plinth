@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { TrendingUp, Users, AlertTriangle, CheckCircle, X, Activity, Key, Copy, BookOpen, CreditCard, Webhook, ArrowRight, Sparkles } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, CheckCircle, X, Activity, Key, Copy, BookOpen, CreditCard, Webhook, ArrowRight, Sparkles, Percent } from 'lucide-react';
 import { Topbar } from '@/components/layout/topbar';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MrrChart } from '@/components/charts/mrr-chart';
 import { SubDonut } from '@/components/charts/sub-donut';
-import { MOCK_STATS, MOCK_EVENTS } from '@/lib/mock-data';
 import { formatKobo, formatRelativeDate } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 const eventTypeColor: Record<string, string> = {
   'subscription': 'text-indigo-600 dark:text-indigo-400',
@@ -161,13 +161,59 @@ function OnboardingView({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+interface LiveStats {
+  mrr: number;
+  activeSubscriptions: number;
+  pastDueSubscriptions: number;
+  accruedRevenue: number;
+  plinthRevenue: number;
+}
+
+async function fetchLiveStats(): Promise<LiveStats> {
+  const [subsRes, plansRes, invoicesRes] = await Promise.allSettled([
+    api.subscriptions.list() as Promise<{ data: any[] }>,
+    api.plans.list()         as Promise<{ data: any[] }>,
+    api.invoices.list()      as Promise<{ data: any[] }>,
+  ]);
+
+  const subs     = subsRes.status     === 'fulfilled' ? (subsRes.value.data     ?? []) : [];
+  const plans    = plansRes.status    === 'fulfilled' ? (plansRes.value.data    ?? []) : [];
+  const invoices = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.data ?? []) : [];
+
+  const planMap = new Map(plans.map((p: any) => [p.id, Number(p.amount_minor)]));
+
+  const activeSubs   = subs.filter((s: any) => s.state === 'active' || s.state === 'trialing');
+  const pastDueSubs  = subs.filter((s: any) => s.state === 'past_due' || s.state === 'grace' || s.state === 'delinquent');
+  const mrr          = activeSubs.reduce((sum: number, s: any) => sum + (planMap.get(s.plan_id) ?? 0), 0);
+  const accruedRevenue = invoices
+    .filter((inv: any) => inv.state === 'paid')
+    .reduce((sum: number, inv: any) => sum + Number(inv.amount_paid ?? 0), 0);
+
+  return {
+    mrr,
+    activeSubscriptions: activeSubs.length,
+    pastDueSubscriptions: pastDueSubs.length,
+    accruedRevenue,
+    plinthRevenue: Math.round(accruedRevenue * 0.005),  // 0.5% split retained by Plinth
+  };
+}
+
 export default function DashboardPage() {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [stats, setStats] = useState<LiveStats | null>(null);
+  const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
 
   useEffect(() => {
     const isNew = localStorage.getItem('plinth_onboarding_shown') !== 'true';
     if (isNew) setShowOnboarding(true);
+  }, []);
+
+  useEffect(() => {
+    fetchLiveStats().then(setStats).catch(() => {});
+    api.invoices.list()
+      .then((res: any) => setRecentInvoices((res.data ?? []).slice(0, 5)))
+      .catch(() => {});
   }, []);
 
   function dismissOnboarding() {
@@ -185,35 +231,38 @@ export default function DashboardPage() {
 
       <div className="p-6 space-y-6">
         {/* Stat cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             label="MRR"
-            value={formatKobo(MOCK_STATS.mrr)}
-            trend={{ value: '12% vs last month', positive: true }}
+            value={stats ? formatKobo(stats.mrr) : '—'}
             icon={<TrendingUp size={20} />}
-            tooltip="Monthly Recurring Revenue — sum of all active subscription amounts"
+            tooltip="Monthly Recurring Revenue — sum of all active + trialing subscription amounts"
           />
           <StatCard
             label="Active Subscriptions"
-            value={String(MOCK_STATS.activeSubscriptions)}
-            sub={`${MOCK_STATS.activeSubscriptions - 38} trialing`}
+            value={stats ? String(stats.activeSubscriptions) : '—'}
             icon={<Users size={20} />}
             tooltip="Total active + trialing subscriptions"
           />
           <StatCard
-            label="Failed Charges"
-            value={String(MOCK_STATS.failedCharges)}
-            sub={`${formatKobo(MOCK_STATS.failedCharges * 500000)} at risk`}
+            label="Past Due"
+            value={stats ? String(stats.pastDueSubscriptions) : '—'}
             icon={<AlertTriangle size={20} />}
-            tooltip="Subscriptions that failed their last charge attempt"
+            tooltip="Subscriptions in past_due, grace, or delinquent state"
           />
           <StatCard
-            label="Recovered"
-            value={formatKobo(MOCK_STATS.recoveredRevenue)}
-            sub="from dunning this month"
-            trend={{ value: 'via retry + transfers', positive: true }}
+            label="Tenant Revenue"
+            value={stats ? formatKobo(stats.accruedRevenue) : '—'}
+            sub="from paid invoices"
             icon={<CheckCircle size={20} />}
-            tooltip="Revenue recovered through dunning retries and transfer rail"
+            tooltip="Total revenue collected on behalf of tenants — sum of all paid invoices"
+          />
+          <StatCard
+            label="Plinth Revenue"
+            value={stats ? formatKobo(stats.plinthRevenue) : '—'}
+            sub="0.5% platform fee"
+            icon={<Percent size={20} />}
+            tooltip="Plinth's earnings — 0.5% of all settled payments (retained in main Nomba account via split)"
           />
         </div>
 
@@ -238,46 +287,45 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Dunning alert */}
-        {!alertDismissed && (
+        {/* Dunning alert — only shown when there are real past-due subscriptions */}
+        {!alertDismissed && stats && stats.pastDueSubscriptions > 0 && (
           <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
             <div className="flex items-center gap-3">
               <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <p className="text-sm text-amber-800 dark:text-amber-300">
-                <strong>5 subscriptions need attention</strong> — 3 past due, 2 in grace.{' '}
+                <strong>{stats.pastDueSubscriptions} subscription{stats.pastDueSubscriptions > 1 ? 's' : ''} need attention</strong> — past due or in grace.{' '}
                 <Link href="/dashboard/dunning" className="underline hover:no-underline">
                   View dunning board →
                 </Link>
               </p>
             </div>
-            <button
-              onClick={() => setAlertDismissed(true)}
-              className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 ml-4"
-            >
+            <button onClick={() => setAlertDismissed(true)} className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 ml-4">
               <X size={16} />
             </button>
           </div>
         )}
 
-        {/* Recent events */}
+        {/* Recent invoices */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Events</CardTitle>
-            <Link href="/dashboard/events" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+            <CardTitle>Recent Invoices</CardTitle>
+            <Link href="/dashboard/invoices" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
               View all →
             </Link>
           </CardHeader>
           <div className="divide-y divide-gray-50 dark:divide-slate-800">
-            {MOCK_EVENTS.slice(0, 5).map((evt) => (
-              <div key={evt.id} className="px-6 py-3 flex items-center gap-4">
+            {recentInvoices.length === 0 ? (
+              <p className="px-6 py-8 text-center text-sm text-gray-400 dark:text-slate-500">No invoices yet</p>
+            ) : recentInvoices.map((inv) => (
+              <div key={inv.id} className="px-6 py-3 flex items-center gap-4">
                 <Activity size={14} className="text-gray-400 shrink-0" />
-                <code className={`text-xs font-mono flex-1 ${getEventColor(evt.type)}`}>
-                  {evt.type}
-                </code>
-                <span className="text-xs text-gray-400 dark:text-slate-500">{evt.resourceId}</span>
-                <Badge status={evt.delivered ? 'delivered' : 'pending'} label={evt.delivered ? 'delivered' : 'pending'} />
+                <span className="font-mono text-xs text-gray-500 dark:text-slate-400 flex-1 truncate">{inv.id}</span>
+                <Badge status={inv.state} label={inv.state} />
+                <span className="text-xs font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap">
+                  {formatKobo(Number(inv.amount_due))}
+                </span>
                 <span className="text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap">
-                  {formatRelativeDate(evt.occurredAt)}
+                  {inv.created_at ? formatRelativeDate(inv.created_at) : '—'}
                 </span>
               </div>
             ))}

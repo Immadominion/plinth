@@ -106,6 +106,17 @@ export class PlanInactiveError extends InvalidRequestError {
   }
 }
 
+export class PlanImmutableError extends InvalidRequestError {
+  constructor(field: string) {
+    super(
+      'plan_immutable',
+      `Cannot change ${field} on a plan that already has subscriptions. Create a new plan and migrate subscribers instead.`,
+      field,
+    );
+    this.name = 'PlanImmutableError';
+  }
+}
+
 export class UnauthorizedError extends DomainError {
   constructor(message = 'Invalid or missing API key') {
     super('api_error', 'unauthorized', message);

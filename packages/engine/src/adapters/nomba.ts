@@ -90,10 +90,20 @@ export interface DebitMandateResult {
   message: string;
 }
 
+export interface LookupOrderResult {
+  found: boolean;
+  settled: boolean;      // true = payment confirmed, activate subscription
+  status: string;
+  amountMinor?: bigint;  // authoritative amount from Nomba (kobo)
+  tokenizedCard?: boolean;
+  cardToken?: string;    // present for card payments — use for recurring charges
+}
+
 export interface NombaAdapter {
   createVirtualAccount(params: CreateVirtualAccountParams): Promise<CreateVirtualAccountResult>;
   createCheckoutOrder(params: CreateCheckoutOrderParams): Promise<CreateCheckoutOrderResult>;
   chargeTokenizedCard(params: ChargeTokenizedCardParams): Promise<ChargeTokenizedCardResult>;
+  lookupOrder(orderReference: string): Promise<LookupOrderResult>;
   payout(params: PayoutParams): Promise<PayoutResult>;
   createMandate(params: CreateMandateParams): Promise<CreateMandateResult>;
   debitMandate(params: DebitMandateParams): Promise<DebitMandateResult>;
@@ -147,6 +157,10 @@ export class FakeNombaAdapter implements NombaAdapter {
     };
   }
 
+  async lookupOrder(_orderReference: string): Promise<LookupOrderResult> {
+    return { found: true, settled: true, status: 'SUCCESS', amountMinor: 0n, tokenizedCard: false };
+  }
+
   async payout(_params: PayoutParams): Promise<PayoutResult> {
     return { success: true, providerReference: `fake_payout_${ulid()}`, status: 'SUCCESS' };
   }
@@ -177,6 +191,13 @@ export class HttpNombaAdapter implements NombaAdapter {
   private tokenCache: { token: string; expiresAt: Date } | null = null;
 
   constructor(private readonly config: NombaHttpConfig) {}
+
+  // Nomba's money API uses NAIRA (decimals), while we track everything internally as
+  // integer kobo. Normalize at the adapter boundary: ₦2,900 = 290000 kobo → send 2900.
+  // (Sending kobo makes Nomba charge 100× — a ₦2,900 plan showed as "₦290,000".)
+  private toNaira(amountMinor: Kobo): number {
+    return Number(amountMinor) / 100;
+  }
 
   private async getToken(): Promise<string> {
     const now = new Date();
@@ -257,7 +278,7 @@ export class HttpNombaAdapter implements NombaAdapter {
 
     const body: Record<string, unknown> = {
       order: {
-        amount:         Number(params.amountMinor),  // kobo integer — cert: "₦2,500 = 250000"
+        amount:         this.toNaira(params.amountMinor),  // Nomba API is in naira, not kobo
         currency:       params.currency ?? 'NGN',
         orderReference: params.orderReference,
         callbackUrl:    params.callbackUrl,
@@ -301,7 +322,7 @@ export class HttpNombaAdapter implements NombaAdapter {
     const body: Record<string, unknown> = {
       tokenKey: params.tokenKey,
       order: {
-        amount:         Number(params.amountMinor),  // kobo integer
+        amount:         this.toNaira(params.amountMinor),  // Nomba API is in naira, not kobo
         currency:       'NGN',
         orderReference: params.merchantTxRef,        // unique per attempt = idempotency key
         callbackUrl:    params.callbackUrl ?? `${this.config.webhookCallbackUrl}/webhooks/nomba`,
@@ -334,6 +355,43 @@ export class HttpNombaAdapter implements NombaAdapter {
       providerReference: params.merchantTxRef,
       providerCode:      json.code ?? 'unknown',
       message:           json.data?.message ?? json.description ?? '',
+    };
+  }
+
+  // Authoritative check of a checkout order. The webhook body is thin and unsigned, so we
+  // re-fetch the transaction from Nomba (authenticated) and reconcile from THIS result.
+  async lookupOrder(orderReference: string): Promise<LookupOrderResult> {
+    const token = await this.getToken();
+    const res = await fetch(
+      `${this.config.baseUrl}/v1/checkout/transaction?idType=ORDER_REFERENCE&id=${encodeURIComponent(orderReference)}`,
+      { headers: this.authHeaders(token) },
+    );
+    if (!res.ok) return { found: false, settled: false, status: `http_${res.status}` };
+    const json = await res.json() as {
+      code: string;
+      data?: {
+        success?: boolean;
+        message?: string;
+        order?: { amount?: string };
+        transactionDetails?: { tokenizedCardPayment?: boolean };
+        cardDetails?: { tokenKey?: string; token?: string; cardId?: string } | null;
+      };
+    };
+    if (json.code !== '00' || !json.data) return { found: false, settled: false, status: json.code };
+
+    const d = json.data;
+    const settled = d.success === true || /successful/i.test(d.message ?? '');
+    // order.amount is in naira (e.g. "300.00") → kobo
+    const amountMinor = d.order?.amount != null ? BigInt(Math.round(Number(d.order.amount) * 100)) : undefined;
+    const cardToken = d.cardDetails?.tokenKey ?? d.cardDetails?.token ?? d.cardDetails?.cardId;
+
+    return {
+      found:         true,
+      settled,
+      status:        d.message ?? '',
+      ...(amountMinor !== undefined ? { amountMinor } : {}),
+      tokenizedCard: d.transactionDetails?.tokenizedCardPayment ?? false,
+      ...(cardToken ? { cardToken } : {}),
     };
   }
 

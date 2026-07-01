@@ -156,6 +156,9 @@ components:
         id:
           type: string
           example: pln_01JABC...
+        plan_group_id:
+          type: string
+          example: pg_01JABC...
         name:
           type: string
           example: Pro
@@ -163,6 +166,29 @@ components:
           type: string
           description: Amount in kobo as a string. ₦5,000 = "500000".
           example: "500000"
+        interval:
+          type: string
+          enum: [day, week, month, year]
+          example: month
+        interval_count:
+          type: integer
+          example: 1
+        trial_period_days:
+          type: integer
+          example: 14
+        lookup_key:
+          type: string
+          nullable: true
+          description: >
+            Stable, human-meaningful handle for the plan (e.g. "pro_monthly"). Unique per tenant.
+            Reference this instead of the UUID so your app doesn't hardcode environment-specific ids.
+          example: pro_monthly
+        active:
+          type: boolean
+          description: >
+            `false` when the plan is archived — hidden from the default plan list and closed to
+            new subscriptions. Existing subscribers keep billing.
+          example: true
         created_at:
           type: string
           format: date-time
@@ -570,12 +596,44 @@ paths:
                 $ref: "#/components/schemas/PlanGroup"
 
   /v1/plans:
+    get:
+      operationId: list-plans
+      summary: List plans
+      description: >
+        Returns the tenant's plans. **Active-only by default** — pass `include_archived=true`
+        to include archived plans too.
+      tags: [Plans]
+      parameters:
+        - name: include_archived
+          in: query
+          required: false
+          description: Include archived (inactive) plans in the result.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: List of plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [list]
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Plan"
     post:
       operationId: create-plan
       summary: Create a plan
       description: >
         Creates a plan within a plan group. Amount is in kobo. Set `trial_period_days`
-        to give new subscribers a free trial before the first charge.
+        to give new subscribers a free trial before the first charge. Set `lookup_key`
+        to a stable handle (e.g. `pro_monthly`) so your app can reference the plan by role
+        instead of by UUID.
       tags: [Plans]
       requestBody:
         required: true
@@ -583,7 +641,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [plan_group_id, name, amount_minor, billing_interval]
+              required: [plan_group_id, name, amount_minor, billing_interval, lookup_key]
               properties:
                 plan_group_id:
                   type: string
@@ -609,6 +667,13 @@ paths:
                   type: integer
                   default: 0
                   example: 14
+                lookup_key:
+                  type: string
+                  pattern: "^[a-z0-9_]+$"
+                  description: >
+                    **Required.** Stable handle (lowercase letters, numbers, underscores), unique per tenant.
+                    Reference this instead of the UUID. Reusing an existing key returns 409.
+                  example: pro_monthly
       responses:
         "201":
           description: Plan created
@@ -621,7 +686,102 @@ paths:
                 id: pln_01JABC...
                 name: Pro
                 amount_minor: "500000"
+                lookup_key: pro_monthly
                 created_at: "2026-06-01T00:00:00Z"
+        "409":
+          description: lookup_key already in use for another plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/plans/{id}:
+    patch:
+      operationId: update-plan
+      summary: Update a plan
+      description: >
+        Updates a plan. Marketing fields (name, `lookup_key`, trial days, `active`) can always
+        be changed. **Price and billing interval are immutable once the plan has subscribers** —
+        attempting to change them returns 400 (`plan_immutable`). To change a price, create a new
+        plan and migrate subscribers with a plan change.
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pln_01JABC...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                amount_minor: { type: integer, description: "Only allowed if the plan has no subscribers." }
+                billing_interval: { type: string, enum: [day, week, month, year] }
+                billing_interval_count: { type: integer }
+                trial_period_days: { type: integer }
+                lookup_key: { type: string, nullable: true, pattern: "^[a-z0-9_]+$" }
+                active: { type: boolean, description: "Set false to archive." }
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+        "400":
+          description: Immutable field change rejected (plan has subscribers)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Cannot change amount on a plan that already has subscriptions. Create a new plan and migrate subscribers instead.
+    delete:
+      operationId: delete-plan
+      summary: Delete or archive a plan
+      description: >
+        **Archive-by-default.** If the plan has any subscriptions it is *archived* (`active=false`):
+        existing subscribers keep billing, history is preserved, and it stops accepting new sign-ups.
+        Only a plan that was never subscribed is permanently hard-deleted. Historical invoices are
+        never affected either way (they snapshot the amount at billing time).
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pln_01JABC...
+      responses:
+        "200":
+          description: Plan archived or deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [plan]
+                  id:
+                    type: string
+                  archived:
+                    type: boolean
+                    description: true = archived (had subscribers); false = hard-deleted (was unused)
+                  deleted:
+                    type: boolean
+              examples:
+                archived:
+                  summary: Plan had subscribers → archived
+                  value: { object: plan, id: pln_01JABC..., archived: true, deleted: false }
+                deleted:
+                  summary: Plan was unused → hard-deleted
+                  value: { object: plan, id: pln_01JABC..., archived: false, deleted: true }
 
   # ──────────────────────────────────────────────────── Subscriptions ───────
   /v1/subscriptions:

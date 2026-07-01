@@ -7,6 +7,7 @@ import { DrizzlePlanRepo as PlanRepo } from '../../src/db/catalog.repo.js';
 import { DrizzleSubscriptionRepo as SubscriptionRepo } from '../../src/db/subscription.repo.js';
 import { DrizzleEventRepo as EventRepo } from '../../src/db/event.repo.js';
 import { DrizzleTenantRepo as TenantRepo } from '../../src/db/tenant.repo.js';
+import { DrizzleTenantPolicyRepo } from '../../src/db/policy.repo.js';
 import { RealClock } from '../../src/adapters/clock.js';
 import { InMemoryJobQueue } from '../../src/adapters/queue.js';
 import { CreateCustomerService } from '../../src/services/customer.service.js';
@@ -32,6 +33,7 @@ describe('Phase 2: outbox atomicity + relay', () => {
   const planRepo = new PlanRepo();
   const subscriptionRepo = new SubscriptionRepo();
   const eventRepo = new EventRepo();
+  const policyRepo = new DrizzleTenantPolicyRepo();
   const jobQueue = new InMemoryJobQueue();
 
   const createTenantSvc = new CreateTenantService(tenantRepo, uow, clock);
@@ -39,7 +41,7 @@ describe('Phase 2: outbox atomicity + relay', () => {
   const createPlanGroupSvc = new CreatePlanGroupService(planGroupRepo, uow, clock);
   const createPlanSvc = new CreatePlanService(planGroupRepo, planRepo, uow, clock);
   const createSubscriptionSvc = new CreateSubscriptionService(
-    customerRepo, planRepo, subscriptionRepo, eventRepo, uow, clock,
+    customerRepo, planRepo, subscriptionRepo, eventRepo, policyRepo, uow, clock,
   );
   const relaySvc = new RelayOutboxService(eventRepo, jobQueue, WEBHOOK_SECRET);
 
@@ -70,6 +72,7 @@ describe('Phase 2: outbox atomicity + relay', () => {
       name:            'Monthly ₦5k',
       amountMinor:     500_000n,
       billingInterval: 'month',
+      lookupKey:       'monthly_5k',
     });
     const { customerId } = await createCustomerSvc.execute({
       tenantId,
@@ -108,6 +111,7 @@ describe('Phase 2: outbox atomicity + relay', () => {
       name:            'Annual',
       amountMinor:     6_000_000n,
       billingInterval: 'year',
+      lookupKey:       'annual',
     });
     const { customerId } = await createCustomerSvc.execute({
       tenantId,
@@ -141,6 +145,7 @@ describe('Phase 2: outbox atomicity + relay', () => {
       name:            'Weekly',
       amountMinor:     100_000n,
       billingInterval: 'week',
+      lookupKey:       'weekly',
     });
     const { customerId } = await createCustomerSvc.execute({
       tenantId,

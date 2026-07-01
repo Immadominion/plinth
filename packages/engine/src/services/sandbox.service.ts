@@ -56,9 +56,9 @@ export class SandboxService {
     const { planGroupId } = await this.createPlanGroup.execute({ tenantId, name: 'Core' });
 
     const [starter, pro, max] = await Promise.all([
-      this.createPlan.execute({ tenantId, planGroupId, name: 'Starter', amountMinor: 200000n, billingInterval: 'month' }),
-      this.createPlan.execute({ tenantId, planGroupId, name: 'Pro',     amountMinor: 500000n, billingInterval: 'month' }),
-      this.createPlan.execute({ tenantId, planGroupId, name: 'Max',     amountMinor: 1200000n, billingInterval: 'month' }),
+      this.createPlan.execute({ tenantId, planGroupId, name: 'Starter', amountMinor: 200000n, billingInterval: 'month', lookupKey: 'starter' }),
+      this.createPlan.execute({ tenantId, planGroupId, name: 'Pro',     amountMinor: 500000n, billingInterval: 'month', lookupKey: 'pro' }),
+      this.createPlan.execute({ tenantId, planGroupId, name: 'Max',     amountMinor: 1200000n, billingInterval: 'month', lookupKey: 'max' }),
     ]);
 
     const { customerId } = await this.createCustomer.execute({

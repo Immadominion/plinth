@@ -297,7 +297,8 @@ export class TickService {
       const amount = plan.amountMinor * BigInt(sub.quantity);
 
       if (sub.state === 'incomplete') {
-        // Strict: record the checkout payment and grant access.
+        // Pay-to-unlock: the checkout charged period 1 and tokenized the card → record it and
+        // grant access. (Nomba can't ₦0-tokenize, so there's no "card-required free trial".)
         const periodStart = now;
         const periodEnd   = addInterval(now, plan.billingInterval, plan.billingIntervalCount);
         await this.recordPaidInvoiceAndActivate(sub, amount, periodStart, periodEnd, true, now);

@@ -46,7 +46,7 @@ export function buildApp(container: Container): Hono {
   app.route('/admin/clock', makeClockRouter());
   app.route('/admin/tick', makeTickRouter(container.tickService, container.tenantRepo, container.clock));
   app.route('/admin/suspense', makeSuspenseRouter(container.reconService, container.suspenseRepo));
-  app.route('/webhooks', makeWebhookRouter(container.reconService, container.cardTokenService, container.tickService));
+  app.route('/webhooks', makeWebhookRouter(container.reconService, container.cardTokenService, container.tickService, container.planChangeService, container.nomba));
 
   const bootstrapRouter = new Hono();
   bootstrapRouter.use('*', idempotencyMiddleware);
@@ -59,9 +59,9 @@ export function buildApp(container: Container): Hono {
 
   v1.route('/customers',     makeCustomersRouter(container.createCustomerService, container.provisionVaService, container.entitlementsService, container.customerRepo));
   v1.route('/plan-groups',   makePlanGroupsRouter(container.createPlanGroupService, container.planGroupRepo));
-  v1.route('/plans',         makePlansRouter(container.createPlanService, container.updatePlanService, container.planRepo));
+  v1.route('/plans',         makePlansRouter(container.createPlanService, container.updatePlanService, container.deletePlanService, container.planRepo));
   v1.route('/subscriptions', makeSubscriptionsRouter(container.createSubscriptionService, container.planChangeService, container.entitlementsService, container.subscriptionRepo));
-  v1.route('/subscriptions', makeCheckoutRouter(container.nomba, container.subscriptionRepo, container.customerRepo, container.planRepo));
+  v1.route('/subscriptions', makeCheckoutRouter(container.nomba, container.subscriptionRepo, container.customerRepo, container.planRepo, container.planChangeService));
   v1.route('/invoices',     makeInvoicesRouter(container.invoiceRepo));
   v1.route('/policy',       makePolicyRouter(container.policyService));
   v1.route('/me',           makeMeRouter(container.tenantRepo));

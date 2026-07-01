@@ -55,7 +55,7 @@ describe('Phase 3: year of card billing', () => {
   const createPlanGroupSvc = new CreatePlanGroupService(planGroupRepo, uow, testClock);
   const createPlanSvc = new CreatePlanService(planGroupRepo, planRepo, uow, testClock);
   const createSubscriptionSvc = new CreateSubscriptionService(
-    customerRepo, planRepo, subscriptionRepo, eventRepo, uow, testClock,
+    customerRepo, planRepo, subscriptionRepo, eventRepo, policyRepo, uow, testClock,
   );
   const tickSvc = new TickService(
     subscriptionRepo, invoiceRepo, eventRepo, planRepo,
@@ -92,6 +92,7 @@ describe('Phase 3: year of card billing', () => {
       name:            'Monthly ₦5k',
       amountMinor:     PLAN_AMOUNT,
       billingInterval: 'month',
+      lookupKey:       'monthly_5k',
     });
     const { customerId } = await createCustomerSvc.execute({
       tenantId,

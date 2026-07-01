@@ -12,7 +12,7 @@ export type SubscriptionState =
 
 const LEGAL: Record<SubscriptionState, SubscriptionState[]> = {
   trialing:   ['active', 'incomplete', 'canceled'],
-  incomplete: ['active', 'canceled'],
+  incomplete: ['active', 'trialing', 'canceled'],
   active:     ['past_due', 'paused', 'canceled'],
   past_due:   ['active', 'grace', 'canceled'],
   grace:      ['active', 'delinquent', 'canceled'],

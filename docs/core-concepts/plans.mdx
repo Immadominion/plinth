@@ -14,6 +14,7 @@ A **plan** belongs to a group and has:
 - An amount in kobo (e.g., 500000 for ₦5,000)
 - A billing interval (`month` or `year`)
 - An optional trial period in days
+- A required **`lookup_key`** — a stable handle (e.g. `pro_monthly`) you reference instead of the UUID
 
 ## Create a plan group and plan
 
@@ -50,7 +51,8 @@ curl -X POST https://api.useplinth.com/v1/plan-groups/pg_01JABC.../plans \
     "name": "Pro",
     "amount_minor": 500000,
     "interval": "month",
-    "trial_period_days": 14
+    "trial_period_days": 14,
+    "lookup_key": "pro_monthly"
   }'
 ```
 
@@ -60,6 +62,7 @@ const plan = await client.planGroups.createPlan('pg_01JABC...', {
   amountMinor: 500000,
   interval: 'month',
   trialPeriodDays: 14,
+  lookupKey: 'pro_monthly',
 });
 ```
 </CodeGroup>
@@ -97,6 +100,34 @@ All `amount_minor` values are in kobo — 1/100th of a Naira. Never pass decimal
 | ₦12,000/month | 1200000 |
 | ₦120,000/year | 12000000 |
 
+## Lookup keys
+
+Every plan **requires** a `lookup_key` (lowercase letters, numbers, underscores — unique per tenant) so your app references a plan by a **stable role** instead of an environment-specific UUID:
+
+```bash
+curl -X POST https://api.useplinth.com/v1/plans \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "plan_group_id": "pg_01JABC...", "name": "Pro", "amount_minor": 500000,
+        "billing_interval": "month", "lookup_key": "pro_monthly" }'
+```
+
+Now your app can `GET /v1/plans`, find the plan whose `lookup_key` is `pro_monthly`, and use its id — no hardcoded ids, and the mapping survives re-provisioning, renames, and price changes. (Reusing a key returns `409`.)
+
+## Changing prices, archiving & deleting plans
+
+<Warning>
+**Prices are immutable once a plan has subscribers.** Changing `amount_minor` or the interval would silently re-price everyone at their next renewal, so Plinth rejects it (`400 plan_immutable`). Marketing fields (name, `lookup_key`, trial days) can always change.
+</Warning>
+
+To **change a price**: create a *new* plan (new price, new `lookup_key` e.g. `pro_monthly_v2`), archive the old one, then either grandfather existing subscribers or migrate them with a [plan change](/api-reference/change-plan).
+
+**Deleting is archive-by-default.** `DELETE /v1/plans/{id}`:
+- If the plan **has subscribers** → it's **archived** (`active: false`): existing subscribers keep billing, history is preserved, and it stops accepting new sign-ups. Response: `{ archived: true, deleted: false }`.
+- If the plan was **never subscribed** → it's **hard-deleted**. Response: `{ archived: false, deleted: true }`.
+
+Historical invoices are never affected either way — they snapshot the amount at billing time.
+
 ## List all plans
 
 ```bash
@@ -104,4 +135,4 @@ curl https://api.useplinth.com/v1/plans \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
 ```
 
-Returns all active plans across all groups. Pass `?plan_group_id=pg_01JABC...` to filter by group.
+Returns **active plans only** by default. Pass `?include_archived=true` to include archived plans.

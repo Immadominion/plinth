@@ -27,7 +27,7 @@ import { DrizzleDunningAttemptRepo } from '../db/dunning.repo.js';
 import { CreateTenantService } from '../services/tenant.service.js';
 import { PostLedgerEntryService } from '../services/ledger.service.js';
 import { CreateCustomerService } from '../services/customer.service.js';
-import { CreatePlanGroupService, CreatePlanService, UpdatePlanService } from '../services/catalog.service.js';
+import { CreatePlanGroupService, CreatePlanService, UpdatePlanService, DeletePlanService } from '../services/catalog.service.js';
 import { CreateSubscriptionService } from '../services/subscription.service.js';
 import { FinalizeInvoiceService } from '../services/invoice.service.js';
 import { RelayOutboxService } from '../services/outbox.service.js';
@@ -61,6 +61,7 @@ export interface Container {
   createPlanGroupService: CreatePlanGroupService;
   createPlanService: CreatePlanService;
   updatePlanService: UpdatePlanService;
+  deletePlanService: DeletePlanService;
   createSubscriptionService: CreateSubscriptionService;
   finalizeInvoiceService: FinalizeInvoiceService;
   relayOutboxService: RelayOutboxService;
@@ -120,7 +121,8 @@ export function buildContainer(): Container {
   const createCustomerService = new CreateCustomerService(customerRepo, uow, clock);
   const createPlanGroupService = new CreatePlanGroupService(planGroupRepo, uow, clock);
   const createPlanService = new CreatePlanService(planGroupRepo, planRepo, uow, clock);
-  const updatePlanService = new UpdatePlanService(planRepo, uow, clock);
+  const updatePlanService = new UpdatePlanService(planRepo, subscriptionRepo, uow, clock);
+  const deletePlanService = new DeletePlanService(planRepo, subscriptionRepo, uow, clock);
   const createSubscriptionService = new CreateSubscriptionService(
     customerRepo, planRepo, subscriptionRepo, eventRepo, policyRepo, uow, clock,
   );
@@ -177,6 +179,7 @@ export function buildContainer(): Container {
     createPlanGroupService,
     createPlanService,
     updatePlanService,
+    deletePlanService,
     createSubscriptionService,
     finalizeInvoiceService,
     relayOutboxService, 

@@ -160,6 +160,9 @@ export const plans = pgTable(
     billingInterval:      text('billing_interval').notNull().$type<'day' | 'week' | 'month' | 'year'>(),
     billingIntervalCount: integer('billing_interval_count').notNull().default(1),
     trialPeriodDays:      integer('trial_period_days').notNull().default(0),
+    // Stable, human-meaningful handle for a plan (e.g. "standard_monthly"). Lets integrating
+    // apps reference plans by role instead of by environment-specific UUIDs.
+    lookupKey:            text('lookup_key'),
     active:               boolean('active').notNull().default(true),
     createdAt:            timestamp('created_at', { withTimezone: true }).notNull(),
     updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull(),
@@ -167,6 +170,7 @@ export const plans = pgTable(
   (t) => [
     index('plans_tenant_id_idx').on(t.tenantId),
     index('plans_plan_group_id_idx').on(t.planGroupId),
+    uniqueIndex('plans_tenant_lookup_key_idx').on(t.tenantId, t.lookupKey),
   ],
 );
 
@@ -282,7 +286,11 @@ export const subscriptionScheduledChanges = pgTable(
     subscriptionId: text('subscription_id').notNull(),
     newPlanId:      text('new_plan_id').notNull(),
     newQuantity:    integer('new_quantity').notNull().default(1),
-    scheduledFor:   timestamp('scheduled_for', { withTimezone: true }).notNull(),
+    // 'period_end' → apply on scheduledFor (a date). 'payment' → apply when a checkout payment settles.
+    applyOn:        text('apply_on').notNull().default('period_end'),
+    scheduledFor:   timestamp('scheduled_for', { withTimezone: true }),
+    // For apply_on='payment': the proration amount quoted at checkout (kobo), recorded as the paid invoice on settle.
+    dueMinor:       bigint('due_minor', { mode: 'bigint' }),
     createdAt:      timestamp('created_at', { withTimezone: true }).notNull(),
   },
   (t) => [

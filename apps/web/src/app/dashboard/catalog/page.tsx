@@ -9,7 +9,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { formatKobo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { Plus, CheckCircle, X, Layers, FolderPlus, HelpCircle } from 'lucide-react';
+import { Plus, CheckCircle, X, Layers, FolderPlus, HelpCircle, Trash2, Archive } from 'lucide-react';
 
 interface PlanGroup {
   id: string;
@@ -26,6 +26,7 @@ interface Plan {
   interval: string;
   interval_count: number;
   trial_period_days: number;
+  lookup_key?: string | null;
   created_at: string;
 }
 
@@ -131,6 +132,24 @@ export default function CatalogPage() {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [deletePlan, setDeletePlan] = useState<Plan | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    if (!deletePlan) return;
+    setDeleting(true);
+    setDeleteErr(null);
+    try {
+      await api.plans.remove(deletePlan.id);
+      setDeletePlan(null);
+      await loadCatalog(); // archived plans drop out of the active-only list
+    } catch (e) {
+      setDeleteErr(e instanceof Error ? e.message : 'Failed to delete plan');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -256,7 +275,16 @@ export default function CatalogPage() {
                                     <span className="text-sm font-normal text-gray-400 dark:text-slate-500"> / {plan.interval}</span>
                                   </p>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => setEditingPlan(plan)}>Edit</Button>
+                                <div className="flex items-center gap-1.5">
+                                  <Button variant="outline" size="sm" onClick={() => setEditingPlan(plan)}>Edit</Button>
+                                  <button
+                                    onClick={() => { setDeletePlan(plan); setDeleteErr(null); }}
+                                    className="rounded-lg border border-gray-200 p-1.5 text-gray-400 hover:border-red-300 hover:text-red-500 dark:border-slate-700 dark:hover:border-red-800"
+                                    title="Archive or delete plan"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 {plan.interval_count > 1 && (
@@ -264,6 +292,11 @@ export default function CatalogPage() {
                                 )}
                                 {plan.trial_period_days > 0 && (
                                   <Badge status="trialing" label={`${plan.trial_period_days}-day trial`} />
+                                )}
+                                {plan.lookup_key && (
+                                  <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:bg-slate-800 dark:text-slate-400">
+                                    {plan.lookup_key}
+                                  </span>
                                 )}
                               </div>
                             </Card>
@@ -364,9 +397,9 @@ export default function CatalogPage() {
       {showGroupModal && (
         <AddPlanGroupModal
           onClose={() => setShowGroupModal(false)}
-          onCreated={(group) => {
-            setGroups((prev) => [...prev, group]);
+          onCreated={() => {
             setShowGroupModal(false);
+            loadCatalog(); // soft refresh — pull the full record back
           }}
         />
       )}
@@ -375,9 +408,9 @@ export default function CatalogPage() {
         <AddPlanModal
           groups={groups}
           onClose={() => setShowPlanModal(false)}
-          onCreated={(plan) => {
-            setPlans((prev) => [...prev, plan]);
+          onCreated={() => {
             setShowPlanModal(false);
+            loadCatalog(); // soft refresh — the create response lacks group/interval fields
           }}
         />
       )}
@@ -391,6 +424,32 @@ export default function CatalogPage() {
             setEditingPlan(null);
           }}
         />
+      )}
+
+      {deletePlan && (
+        <ModalShell
+          title={`Delete “${deletePlan.name}”?`}
+          subtitle="Plans with subscribers are archived, not deleted."
+          icon={<Trash2 size={20} className="text-red-500" />}
+          onClose={() => setDeletePlan(null)}
+        >
+          <div className="space-y-3">
+            <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 px-3 py-2.5 dark:bg-amber-950/30">
+              <Archive size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                If anyone is subscribed, the plan is <strong>archived</strong> — existing subscribers keep billing and
+                history is preserved; it just stops accepting new sign-ups. Only a never-subscribed plan is permanently deleted.
+              </p>
+            </div>
+            {deleteErr && <p className="text-xs text-red-600 dark:text-red-400">{deleteErr}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDeletePlan(null)}>Cancel</Button>
+              <Button type="button" variant="destructive" size="sm" disabled={deleting} onClick={confirmDelete}>
+                {deleting ? 'Working…' : 'Delete / Archive'}
+              </Button>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );
@@ -530,6 +589,7 @@ function AddPlanModal({
   const [interval, setInterval] = useState<BillingInterval>('month');
   const [intervalCount, setIntervalCount] = useState('1');
   const [trialDays, setTrialDays] = useState('0');
+  const [lookupKey, setLookupKey] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -550,6 +610,7 @@ function AddPlanModal({
         billing_interval: interval,
         billing_interval_count: Number(intervalCount) || 1,
         trial_period_days: Number(trialDays) || 0,
+        lookup_key: lookupKey.trim(),
       })) as Plan;
       onCreated(created);
     } catch (e) {
@@ -630,13 +691,21 @@ function AddPlanModal({
             onChange={(e) => setTrialDays(e.target.value)}
           />
         </Field>
+        <Field label="Lookup key" hint="A stable handle (e.g. standard_monthly) your app references instead of the plan's UUID. Lowercase letters, numbers and underscores. Unique per catalog.">
+          <Input
+            value={lookupKey}
+            onChange={(e) => setLookupKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+            placeholder="e.g. standard_monthly"
+            required
+          />
+        </Field>
         {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
           <Button
             type="submit"
             size="sm"
-            disabled={submitting || !planGroupId || !name.trim() || !(Number(amountNaira) > 0)}
+            disabled={submitting || !planGroupId || !name.trim() || !(Number(amountNaira) > 0) || !lookupKey.trim()}
           >
             {submitting ? 'Creating…' : 'Create plan'}
           </Button>

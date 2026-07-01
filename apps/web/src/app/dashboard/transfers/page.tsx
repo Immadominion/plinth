@@ -1,68 +1,154 @@
 'use client';
-import { useState } from 'react';
-import type { Metadata } from 'next';
+import { useState, useEffect } from 'react';
 import { Topbar } from '@/components/layout/topbar';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, Thead, Th, Tbody, Tr, Td } from '@/components/ui/table';
-import { MOCK_TRANSFERS } from '@/lib/mock-data';
-import { formatKobo } from '@/lib/utils';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { api } from '@/lib/api';
+import { formatKobo, formatDate } from '@/lib/utils';
+import { AlertTriangle, CheckCircle, ArrowDownLeft } from 'lucide-react';
+
+interface Invoice {
+  id: string;
+  customer_id: string;
+  subscription_id: string;
+  state: string;
+  amount_due: string;
+  amount_paid: string;
+  closed_at: string | null;
+  created_at: string;
+}
+
+interface SuspenseItem {
+  id: string;
+  tenant_id: string;
+  amount_minor: string;
+  account_ref: string;
+  narration: string;
+  reason: string;
+  created_at: string;
+}
+
+interface CustomerMap { [id: string]: string }
 
 export default function TransfersPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [suspenseItems, setSuspenseItems] = useState<SuspenseItem[]>([]);
+  const [customerNames, setCustomerNames] = useState<CustomerMap>({});
+  const [loading, setLoading] = useState(true);
   const [resolveId, setResolveId] = useState<string | null>(null);
   const [resolveNote, setResolveNote] = useState('');
-  const [resolved, setResolved] = useState<Set<string>>(new Set());
 
-  function handleResolve(id: string) {
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const [invRes, suspRes, custRes] = await Promise.allSettled([
+          api.invoices.list() as Promise<{ data: Invoice[] }>,
+          api.suspense.list() as Promise<{ data: SuspenseItem[] }>,
+          api.customers.list() as Promise<{ data: { id: string; name: string }[] }>,
+        ]);
+        if (cancelled) return;
+
+        const paidInvoices = invRes.status === 'fulfilled'
+          ? (invRes.value.data ?? []).filter((i) => i.state === 'paid')
+          : [];
+        setInvoices(paidInvoices);
+
+        if (suspRes.status === 'fulfilled') setSuspenseItems(suspRes.value.data ?? []);
+
+        if (custRes.status === 'fulfilled') {
+          const map: CustomerMap = {};
+          for (const c of custRes.value.data ?? []) map[c.id] = c.name;
+          setCustomerNames(map);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleResolve(id: string) {
     if (!resolveNote.trim()) return;
-    setResolved(prev => new Set([...prev, id]));
-    setResolveId(null);
-    setResolveNote('');
+    try {
+      await api.suspense.resolve(id, resolveNote);
+      setSuspenseItems((prev) => prev.filter((s) => s.id !== id));
+      setResolveId(null);
+      setResolveNote('');
+    } catch {
+      alert('Failed to resolve — check console');
+    }
   }
-
-  const suspenseItems = MOCK_TRANSFERS.suspense.filter((s) => !resolved.has(s.id));
 
   return (
     <div className="flex flex-col">
-      <Topbar title="Transfers" subtitle="VA transfers & reconciliation" />
+      <Topbar title="Payment Inflows" subtitle="Settled payments & reconciliation" />
 
       <div className="p-6 space-y-6">
-        {/* Recent Transfers */}
+        {/* Recent Inflows */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Transfers</CardTitle>
+            <div className="flex items-center gap-2">
+              <ArrowDownLeft size={14} className="text-emerald-500" />
+              <CardTitle>Settled Payments</CardTitle>
+            </div>
           </CardHeader>
-          <Table>
-            <Thead>
-              <tr>
-                <Th>Date</Th>
-                <Th>Account Ref</Th>
-                <Th>Amount</Th>
-                <Th>Narration</Th>
-                <Th>Outcome</Th>
-                <Th>Matched Invoice</Th>
-              </tr>
-            </Thead>
-            <Tbody>
-              {MOCK_TRANSFERS.recent.map((t) => (
-                <Tr key={t.id}>
-                  <Td className="text-gray-500 dark:text-slate-400">{t.date}</Td>
-                  <Td className="font-mono text-xs">{t.accountRef}</Td>
-                  <Td>{formatKobo(t.amount)}</Td>
-                  <Td className="text-gray-500 dark:text-slate-400 text-xs">{t.narration}</Td>
-                  <Td>
-                    <Badge status={t.outcome} label={t.outcome} />
-                  </Td>
-                  <Td className="font-mono text-xs text-gray-400 dark:text-slate-500">
-                    {t.matchedInvoice ?? '—'}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
+          {loading ? (
+            <CardContent>
+              <p className="text-sm text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</p>
+            </CardContent>
+          ) : invoices.length === 0 ? (
+            <CardContent>
+              <p className="text-sm text-gray-400 dark:text-slate-500 py-8 text-center">No settled payments yet</p>
+            </CardContent>
+          ) : (
+            <Table>
+              <Thead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Customer</Th>
+                  <Th>Invoice</Th>
+                  <Th>Amount (Tenant)</Th>
+                  <Th>Plinth Fee (0.5%)</Th>
+                  <Th>State</Th>
+                </tr>
+              </Thead>
+              <Tbody>
+                {invoices.map((inv) => {
+                  const amount = Number(inv.amount_paid || inv.amount_due);
+                  const plinthCut = Math.round(amount * 0.005);
+                  const tenantNet = amount - plinthCut;
+                  return (
+                    <Tr key={inv.id}>
+                      <Td className="text-gray-500 dark:text-slate-400">
+                        {inv.closed_at ? formatDate(inv.closed_at) : formatDate(inv.created_at)}
+                      </Td>
+                      <Td className="font-medium text-gray-900 dark:text-slate-100">
+                        {customerNames[inv.customer_id] ?? (
+                          <span className="font-mono text-xs text-gray-500 dark:text-slate-400">{inv.customer_id}</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <span className="font-mono text-xs text-gray-500 dark:text-slate-400">{inv.id}</span>
+                      </Td>
+                      <Td className="text-gray-900 dark:text-slate-100 font-medium">
+                        {formatKobo(tenantNet)}
+                      </Td>
+                      <Td className="text-indigo-600 dark:text-indigo-400 font-medium">
+                        {formatKobo(plinthCut)}
+                      </Td>
+                      <Td><Badge status={inv.state} label={inv.state} /></Td>
+                    </Tr>
+                  );
+                })}
+              </Tbody>
+            </Table>
+          )}
         </Card>
 
         {/* Suspense Queue */}
@@ -82,7 +168,7 @@ export default function TransfersPage() {
             </div>
             {suspenseItems.length > 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                Review and resolve manually
+                Payments received but not matched to an invoice — review and resolve manually
               </p>
             )}
           </CardHeader>
@@ -110,9 +196,9 @@ export default function TransfersPage() {
                 {suspenseItems.map((item) => (
                   <>
                     <Tr key={item.id}>
-                      <Td className="text-gray-500 dark:text-slate-400">{item.date}</Td>
-                      <Td className="font-mono text-xs">{item.accountRef}</Td>
-                      <Td>{formatKobo(item.amount)}</Td>
+                      <Td className="text-gray-500 dark:text-slate-400">{formatDate(item.created_at)}</Td>
+                      <Td className="font-mono text-xs">{item.account_ref}</Td>
+                      <Td>{formatKobo(Number(item.amount_minor))}</Td>
                       <Td className="text-gray-500 dark:text-slate-400 text-xs">{item.narration}</Td>
                       <Td>
                         <span className="text-xs font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded">

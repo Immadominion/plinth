@@ -34,6 +34,7 @@ export interface SubscriptionRepo {
   findDueForBilling(tenantId: string, asOf: Date, tx?: TxContext): Promise<Subscription[]>;
   findTrialsEnding(tenantId: string, asOf: Date, tx?: TxContext): Promise<Subscription[]>;
   findByState(tenantId: string, state: SubscriptionState): Promise<Subscription[]>;
+  countByPlan(tenantId: string, planId: string): Promise<number>;
   create(subscription: Subscription, tx?: TxContext): Promise<void>;
   updateState(tenantId: string, id: string, state: SubscriptionState, updatedAt: Date, tx: TxContext): Promise<void>;
   update(subscription: Subscription, tx: TxContext): Promise<void>;
@@ -135,6 +136,14 @@ export class DrizzleSubscriptionRepo implements SubscriptionRepo {
         ),
       );
     return rows.map(toDomain);
+  }
+
+  async countByPlan(tenantId: string, planId: string): Promise<number> {
+    const rows = await db
+      .select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(and(eq(subscriptions.tenantId, tenantId), eq(subscriptions.planId, planId)));
+    return rows.length;
   }
 
   async create(subscription: Subscription, tx?: TxContext): Promise<void> {
