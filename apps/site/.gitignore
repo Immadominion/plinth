@@ -1,0 +1,11 @@
+.next/
+node_modules/
+next-env.d.ts
+*.tsbuildinfo
+
+# never ship dev/automation scripts from the served public/ root
+public/*.py
+
+# internal working docs — not part of the shipped/versioned site
+BRIDGE_VERSIONS.md
+plinth-landing-page-brief.md

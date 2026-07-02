@@ -1,0 +1,229 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* where the danfo's wheels sit (the bridge deck line) */
+  --hero-deck: 13%;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Rive cursor ---------- */
+/* When the custom Rive cursor is active (fine pointer only), hide the OS
+   cursor everywhere so the Rive hand is the only pointer on screen. */
+html.has-rive-cursor,
+html.has-rive-cursor * {
+  cursor: none !important;
+}
+
+/* ---------- Logo marquee (advert banner) ---------- */
+@keyframes plinth-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: plinth-marquee 30s linear infinite;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* The road-median brand "advert" now lives in the 3-D scene (components/RoadLogos.tsx),
+   painted onto the median so it stays locked under camera parallax — no CSS needed. */
+
+/* ---------- Hero scene ---------- */
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* bridge as a treated horizon band across the lower third */
+.bridge {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 120%;
+  max-width: 1760px;
+  min-width: 1200px;
+  height: 52%;
+  object-fit: cover;
+  object-position: center 66%;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 64%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 64%, transparent 100%);
+  filter: grayscale(0.42) saturate(0.62) brightness(1.06) contrast(1.03);
+  opacity: 0.92;
+}
+
+/* cool jade-stone wash so the bridge reads as a branded duotone, not a stock photo */
+.band-wash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
+  background: linear-gradient(
+    to top,
+    rgba(20, 24, 28, 0.16) 0%,
+    rgba(15, 163, 127, 0.08) 30%,
+    rgba(227, 236, 236, 0) 72%
+  );
+  mix-blend-mode: multiply;
+}
+
+/* soft ground fade at the very bottom */
+.band-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16%;
+  background: linear-gradient(to top, #dfe8e9 0%, rgba(223, 232, 233, 0) 100%);
+}
+
+/* the bridge deck / road the danfo drives on (covers the busy skyline bottom) */
+.deck {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hero-deck);
+  background: linear-gradient(
+    to bottom,
+    rgba(221, 232, 233, 0) 0%,
+    rgba(221, 232, 233, 0.55) 9%,
+    #dde8e8 28%,
+    #d4e0e1 100%
+  );
+}
+.deck::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(20, 24, 28, 0.16) 14%,
+    rgba(20, 24, 28, 0.16) 86%,
+    transparent
+  );
+}
+
+.danfo {
+  position: absolute;
+  bottom: var(--hero-deck);
+  left: 0;
+  width: clamp(180px, 21vw, 300px);
+  will-change: transform;
+  transform: translateX(120vw);
+}
+.danfo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 10px 10px rgba(20, 24, 28, 0.16));
+}
+.danfo-shadow {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 4%;
+  height: 12px;
+  background: radial-gradient(ellipse at center, rgba(20, 24, 28, 0.3), rgba(20, 24, 28, 0) 72%);
+  filter: blur(3px);
+  z-index: 0;
+}
+
+/* ---------- Clouds (CSS drift) ---------- */
+.cloud {
+  position: absolute;
+  border-radius: 999px;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  filter: blur(2px);
+  will-change: transform;
+}
+.cloud-a {
+  top: 15%;
+  width: 320px;
+  height: 110px;
+  animation: drift 64s linear infinite;
+}
+.cloud-b {
+  top: 24%;
+  width: 220px;
+  height: 78px;
+  opacity: 0.8;
+  animation: drift 92s linear infinite;
+  animation-delay: -34s;
+}
+.cloud-c {
+  top: 8%;
+  width: 440px;
+  height: 132px;
+  opacity: 0.55;
+  animation: drift 120s linear infinite;
+  animation-delay: -70s;
+}
+@keyframes drift {
+  from {
+    transform: translateX(114vw);
+  }
+  to {
+    transform: translateX(-54vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .bridge,
+  .band-wash {
+    min-width: 860px;
+    width: 240%;
+    height: 42%;
+  }
+  .band-floor {
+    height: 14%;
+  }
+  .danfo {
+    bottom: 12%;
+    width: 190px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .danfo {
+    transform: translateX(14vw);
+  }
+  .cloud {
+    animation: none;
+  }
+}
