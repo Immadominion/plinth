@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { Table, Thead, Th, Tbody, Tr, Td } from '@/components/ui/table';
-import { api } from '@/lib/api';
+import { api, type VirtualAccount } from '@/lib/api';
 import { formatKobo, formatDate } from '@/lib/utils';
 
 interface Customer {
@@ -56,6 +56,8 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [subs, setSubs] = useState<Subscription[]>([]);
+  const [va, setVa] = useState<VirtualAccount | null>(null);
+  const [provisioning, setProvisioning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +72,17 @@ export default function CustomerDetailPage() {
       setCustomer(customerData);
 
       // These are best-effort and shouldn't block rendering the customer.
-      const [ent, subList] = await Promise.allSettled([
+      const [ent, subList, vaRes] = await Promise.allSettled([
         api.customers.entitlements(id) as Promise<Entitlements>,
         api.subscriptions.list() as Promise<{ data: Subscription[] }>,
+        api.customers.getVirtualAccount(id),
       ]);
 
       if (ent.status === 'fulfilled') setEntitlements(ent.value);
       if (subList.status === 'fulfilled') {
         setSubs((subList.value.data ?? []).filter((s) => s.customer_id === id));
       }
+      setVa(vaRes.status === 'fulfilled' ? vaRes.value : null); // 404 → none yet
     } catch (e) {
       if (e instanceof Error && /404/.test(e.message)) {
         setNotFound(true);
@@ -97,6 +101,14 @@ export default function CustomerDetailPage() {
     navigator.clipboard.writeText(customer.id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function provisionVa() {
+    if (!id) return;
+    setProvisioning(true);
+    try { setVa(await api.customers.virtualAccount(id)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to provision virtual account'); }
+    finally { setProvisioning(false); }
   }
 
   if (loading) {
@@ -182,6 +194,39 @@ export default function CustomerDetailPage() {
                   <p className="text-xs text-gray-500 dark:text-slate-400">Created</p>
                   <p className="text-sm text-gray-700 dark:text-slate-300">{formatDate(customer.created_at)}</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Virtual account (transfer rail) */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Virtual account</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {va ? (
+                  <div className="space-y-2.5">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">Bank</p>
+                      <p className="text-sm text-gray-700 dark:text-slate-300">{va.bank_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">Account number</p>
+                      <p className="text-sm font-mono font-semibold text-gray-900 dark:text-slate-100 tracking-wide">{va.account_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">Account name</p>
+                      <p className="text-sm text-gray-700 dark:text-slate-300">{va.account_name}</p>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-slate-500 pt-1">Transfers here reconcile to this customer&apos;s invoices automatically.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400 dark:text-slate-500">No virtual account yet. Provision a dedicated NUBAN for this customer to pay by transfer.</p>
+                    <Button size="sm" variant="outline" onClick={provisionVa} disabled={provisioning}>
+                      {provisioning ? 'Provisioning…' : 'Provision virtual account'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

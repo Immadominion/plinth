@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, CreditCard, AlertTriangle,
   FileText, ArrowLeftRight, Package, Activity, Settings, Zap,
-  LogOut, ChevronUp,
+  Webhook, LogOut, ChevronUp,
 } from 'lucide-react';
 import { api, logout } from '@/lib/api';
 
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/transfers',     icon: ArrowLeftRight,  label: 'Transfers' },
   { href: '/dashboard/catalog',       icon: Package,         label: 'Catalog' },
   { href: '/dashboard/events',        icon: Activity,        label: 'Events' },
+  { href: '/dashboard/webhooks',      icon: Webhook,         label: 'Webhooks' },
   { href: '/dashboard/settings',      icon: Settings,        label: 'Settings' },
 ];
 

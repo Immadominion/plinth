@@ -1,5 +1,20 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:7331';
 
+export interface VirtualAccount {
+  id: string; customer_id: string; account_number: string; bank_name: string;
+  account_name: string; account_ref: string; created_at: string;
+}
+export interface WebhookEndpoint {
+  id: string; url: string; description: string | null; enabled: boolean;
+  event_types: string[]; secret?: string; created_at: string; updated_at: string;
+}
+export interface WebhookDelivery {
+  id: string; endpoint_id: string; event_id: string; event_type: string;
+  status: 'pending' | 'retrying' | 'succeeded' | 'failed'; attempts: number;
+  response_code: number | null; error: string | null;
+  next_retry_at: string | null; last_attempt_at: string | null; created_at: string;
+}
+
 function getKey(): string {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem('nomba_api_key') ?? '';
@@ -46,7 +61,8 @@ export const api = {
     get:           (id: string)  => request(`/v1/customers/${id}`),
     entitlements:  (id: string)  => request(`/v1/customers/${id}/entitlements`),
     create:        (data: unknown) => request('/v1/customers', { method: 'POST', body: JSON.stringify(data) }),
-    virtualAccount:(id: string)  => request(`/v1/customers/${id}/virtual-account`, { method: 'POST' }),
+    virtualAccount:(id: string)  => request<VirtualAccount>(`/v1/customers/${id}/virtual-account`, { method: 'POST' }),
+    getVirtualAccount:(id: string) => request<VirtualAccount>(`/v1/customers/${id}/virtual-account`),
   },
   subscriptions: {
     list:          ()         => request('/v1/subscriptions'),
@@ -119,6 +135,16 @@ export const api = {
     list:   ()                         => request('/v1/keys'),
     create: (mode: 'live' | 'test')    => request<{ api_key: string; id: string; prefix: string }>('/v1/keys', { method: 'POST', body: JSON.stringify({ mode }) }),
     revoke: (id: string)               => request(`/v1/keys/${id}`, { method: 'DELETE' }),
+  },
+  webhookEndpoints: {
+    list:        ()             => request<{ data: WebhookEndpoint[] }>('/v1/webhook-endpoints'),
+    create:      (data: { url: string; description?: string; event_types?: string[] }) =>
+                                   request<WebhookEndpoint>('/v1/webhook-endpoints', { method: 'POST', body: JSON.stringify(data) }),
+    update:      (id: string, data: unknown) => request<WebhookEndpoint>(`/v1/webhook-endpoints/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    rotate:      (id: string)   => request<WebhookEndpoint>(`/v1/webhook-endpoints/${id}/rotate-secret`, { method: 'POST' }),
+    remove:      (id: string)   => request(`/v1/webhook-endpoints/${id}`, { method: 'DELETE' }),
+    deliveries:  (id: string)   => request<{ counts: Record<string, number>; data: WebhookDelivery[] }>(`/v1/webhook-endpoints/${id}/deliveries`),
+    resend:      (id: string, deliveryId: string) => request(`/v1/webhook-endpoints/${id}/deliveries/${deliveryId}/resend`, { method: 'POST' }),
   },
   applications: {
     submit:  (data: unknown) => request('/v1/applications', { method: 'POST', body: JSON.stringify(data) }),

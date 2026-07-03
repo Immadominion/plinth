@@ -47,9 +47,18 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [clockDays, setClockDays] = useState('30');
+  const [simNow, setSimNow] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [actionSub, setActionSub] = useState<Subscription | null>(null);
+
+  async function refreshClock() {
+    try {
+      const c: any = await api.clock.get();
+      setSimNow(c?.simulated_now ?? null);
+    } catch { /* clock endpoint optional */ }
+  }
 
   async function load() {
     setError('');
@@ -62,6 +71,7 @@ export default function SubscriptionsPage() {
       setSubs(s.data ?? []);
       setCustomers(c.data ?? []);
       setPlans(p.data ?? []);
+      refreshClock();
     } catch (err: any) {
       setError(err.message ?? 'Failed to load subscriptions');
     } finally {
@@ -95,10 +105,12 @@ export default function SubscriptionsPage() {
   }
 
   async function advanceClock() {
+    const days = Number(clockDays);
+    if (!Number.isFinite(days) || days <= 0) { flash('Enter a positive number of days.'); return; }
     setBusy(true);
     try {
-      await api.clock.advance(30 * 24 * 60 * 60);
-      flash('Clock advanced 30 days. Run a billing tick to charge due subscriptions.');
+      await api.clock.advance(Math.round(days * 24 * 60 * 60));
+      flash(`Clock advanced ${days} day${days === 1 ? '' : 's'}. Run a billing tick to charge due subscriptions.`);
       await load();
     } catch (err: any) {
       flash(`Advance failed: ${err.message}`);
@@ -116,9 +128,27 @@ export default function SubscriptionsPage() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Tabs tabs={FILTER_TABS} activeTab={activeTab} onChange={setActiveTab} />
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={advanceClock} disabled={busy}>
-              <FastForward size={14} /> Advance 30d
-            </Button>
+            {/* Advance the test clock by a custom number of days */}
+            <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+              <input
+                type="number"
+                min={1}
+                value={clockDays}
+                onChange={(e) => setClockDays(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !busy) advanceClock(); }}
+                disabled={busy}
+                className="w-14 text-sm text-right bg-white dark:bg-slate-900 px-2 py-1.5 outline-none tabular-nums disabled:opacity-60"
+                aria-label="Days to advance"
+              />
+              <span className="text-xs text-gray-400 dark:text-slate-500 pr-2 select-none">days</span>
+              <button
+                onClick={advanceClock}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 border-l border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
+              >
+                <FastForward size={14} /> Advance
+              </button>
+            </div>
             <Button variant="outline" size="sm" onClick={runTick} disabled={busy}>
               <Play size={14} /> Run billing tick
             </Button>
@@ -127,6 +157,12 @@ export default function SubscriptionsPage() {
             </Button>
           </div>
         </div>
+
+        {simNow && (
+          <p className="text-xs text-gray-400 dark:text-slate-500">
+            Simulated time: <span className="font-mono text-gray-600 dark:text-slate-300">{new Date(simNow).toLocaleString()}</span>
+          </p>
+        )}
 
         {notice && (
           <div className="text-xs text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-lg px-3 py-2">
