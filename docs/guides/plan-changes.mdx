@@ -89,6 +89,23 @@ You can override the strategy:
 
 Options: `"immediate"` or `"period_end"`.
 
+## Upgrades without a card on file
+
+`/change` collects an immediate upgrade by charging a stored card token. If the customer has **no
+card** (e.g. they pay by bank transfer), that charge can't happen — `/change` returns
+`no_payment_method`. Instead of dead-ending, collect the prorated difference via a checkout:
+
+```bash
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../change-checkout \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -d '{ "plan_id": "pln_01STANDARD..." }'
+```
+
+Redirect the customer to the returned `checkoutLink`. The plan **stays unchanged until the payment
+settles** — Plinth records the intended change as pending and applies the swap (plus a paid proration
+invoice) when the webhook confirms payment, emitting `subscription.upgraded`. See
+[Checkout-funded plan change](/api-reference/change-checkout).
+
 ## Cancel a scheduled change
 
 If the customer changes their mind before the scheduled change fires:

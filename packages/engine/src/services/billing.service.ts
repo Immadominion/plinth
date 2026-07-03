@@ -486,6 +486,34 @@ export class TickService {
       await this.invoiceRepo.create(invoice, tx);
     });
 
+    // Transfer rail: there's no card to charge. Open the invoice and let the customer pay it by
+    // transfer to their virtual account — do NOT treat "no card" as a failed payment. Advance the
+    // period (access continues) and emit a payment-due event; the app fetches the VA lazily via
+    // /transfer-details. The transfer-reconciliation webhook closes the invoice when the money lands.
+    if (sub.preferredRail === 'transfer') {
+      await this.uow.run(async (tx) => {
+        const locked = await this.subscriptionRepo.findForUpdate(sub.tenantId, sub.id, tx);
+        if (!locked) return;
+        await this.subscriptionRepo.update({
+          ...locked,
+          planId:             effectivePlanId,
+          quantity:           effectiveQty,
+          currentPeriodStart: nextPeriodStart,
+          currentPeriodEnd:   nextPeriodEnd,
+          nextBillAt:         nextPeriodEnd,
+          updatedAt:          now,
+        }, tx);
+        if (scheduledChange) await this.scheduledChangeRepo.deleteBySubscription(sub.tenantId, sub.id, tx);
+        await this.eventRepo.append({
+          id: `evt_${ulid()}`, tenantId: sub.tenantId, type: 'invoice.payment_due',
+          resourceType: 'invoice', resourceId: invoiceId,
+          payload: { subscriptionId: sub.id, invoiceId, amountMinor: amountDue.toString(), rail: 'transfer' },
+          occurredAt: now, createdAt: now,
+        }, tx);
+      });
+      return true;
+    }
+
     const tokenKey = sub.defaultPaymentMethodId;
     if (!tokenKey) {
       await this.markPastDue(sub, invoiceId, 'no_payment_method', now);

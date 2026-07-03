@@ -1,0 +1,50 @@
+---
+title: 'Checkout-funded plan change'
+description: 'Upgrade a subscription that has no card on file by collecting the proration via checkout.'
+---
+
+## POST /v1/subscriptions/:id/change-checkout
+
+When a customer has **no payment method on file** (e.g. they paid by bank transfer, which doesn't
+tokenize), an immediate paid upgrade can't be auto-charged. Instead of failing, call this to collect
+the prorated upgrade amount through a Nomba-hosted checkout. The intended change is recorded as
+pending; when the payment settles, the payment webhook swaps the plan and records the paid
+proration invoice.
+
+Only meaningful when the change costs money now (an upgrade with a positive net). Lateral moves and
+downgrades need no payment — use [`/change`](/api-reference/change-plan) instead (they return
+`no_payment_required` here).
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../change-checkout \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "plan_id": "pln_01STANDARD..." }'
+```
+
+<ParamField body="plan_id" type="string" required>
+  The plan to move to.
+</ParamField>
+
+```json Response
+{
+  "checkoutLink": "https://pay.nomba.com/...",
+  "orderReference": "plinth_sub_01JABC..._8K93J6",
+  "customerId": "cus_01JXYZ...",
+  "subscriptionId": "sub_01JABC...",
+  "dueMinor": "259757",
+  "direction": "upgrade",
+  "newPlanName": "Standard"
+}
+```
+
+<ResponseField name="checkoutLink" type="string">
+  Redirect the customer here. They can pay by card or transfer.
+</ResponseField>
+<ResponseField name="dueMinor" type="string">
+  The prorated amount collected now (kobo).
+</ResponseField>
+
+The plan does **not** change until the payment settles — the subscription stays on its current plan
+until the webhook applies the swap (respecting the tenant's activation strategy). Listen for
+`subscription.upgraded` / `invoice.paid` to know when it lands.

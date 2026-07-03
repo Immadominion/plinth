@@ -13,6 +13,11 @@ export class ProvisionVirtualAccountService {
     private readonly clock: Clock,
   ) {}
 
+  // Return the customer's VA if already provisioned (no Nomba call). Null if none yet.
+  findExisting(tenantId: string, customerId: string): Promise<VirtualAccount | null> {
+    return this.virtualAccountRepo.findByCustomer(tenantId, customerId);
+  }
+
   async execute(params: { tenantId: string; customerId: string }): Promise<VirtualAccount> {
     const { tenantId, customerId } = params;
 

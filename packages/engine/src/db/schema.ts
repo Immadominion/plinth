@@ -267,6 +267,43 @@ export const invoiceLineItems = pgTable(
   ],
 );
 
+// Per-tenant outbound webhook destinations. `secret` (whsec_…) signs each delivery; `eventTypes`
+// empty = subscribe to all events, otherwise a filter list.
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id:          text('id').primaryKey(),
+  tenantId:    text('tenant_id').notNull(),
+  url:         text('url').notNull(),
+  secret:      text('secret').notNull(),
+  description: text('description'),
+  enabled:     boolean('enabled').notNull().default(true),
+  eventTypes:  json('event_types').notNull().default([]).$type<string[]>(),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull(),
+}, (t) => [
+  index('webhook_endpoints_tenant_idx').on(t.tenantId),
+]);
+
+// Fan-out log: one row per (event × endpoint). Drives retries and the dashboard delivery view.
+export const webhookDeliveries = pgTable('webhook_deliveries', {
+  id:            text('id').primaryKey(),
+  tenantId:      text('tenant_id').notNull(),
+  endpointId:    text('endpoint_id').notNull(),
+  eventId:       text('event_id').notNull(),
+  eventType:     text('event_type').notNull(),
+  status:        text('status').notNull().default('pending').$type<'pending' | 'retrying' | 'succeeded' | 'failed'>(),
+  attempts:      integer('attempts').notNull().default(0),
+  responseCode:  integer('response_code'),
+  error:         text('error'),
+  nextRetryAt:   timestamp('next_retry_at', { withTimezone: true }),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull(),
+}, (t) => [
+  uniqueIndex('webhook_deliveries_endpoint_event_idx').on(t.endpointId, t.eventId),
+  index('webhook_deliveries_due_idx').on(t.status, t.nextRetryAt),
+  index('webhook_deliveries_endpoint_idx').on(t.endpointId, t.createdAt),
+]);
+
 export const tenantPolicies = pgTable('tenant_policies', {
   tenantId:            text('tenant_id').primaryKey(),
   upgradeStrategy:     text('upgrade_strategy').notNull().default('immediate_prorated'),

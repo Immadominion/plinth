@@ -66,7 +66,8 @@
         "guides/plan-changes",
         "guides/dunning",
         "guides/arrears-billing",
-        "guides/test-clock"
+        "guides/test-clock",
+        "guides/receiving-webhooks"
       ]
     },
     {
@@ -113,7 +114,17 @@
             "api-reference/get-subscription-status",
             "api-reference/preview-plan-change",
             "api-reference/change-plan",
+            "api-reference/change-checkout",
+            "api-reference/checkout-link",
+            "api-reference/cancel-subscription",
+            "api-reference/reactivate-subscription",
             "api-reference/cancel-scheduled-change"
+          ]
+        },
+        {
+          "group": "Webhooks",
+          "pages": [
+            "api-reference/webhooks"
           ]
         },
         {

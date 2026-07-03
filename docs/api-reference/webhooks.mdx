@@ -1,121 +1,126 @@
 ---
-title: 'Webhooks'
-description: 'Register endpoints and verify signatures for incoming events.'
+title: 'Webhook endpoints'
+description: 'Manage the endpoints Plinth delivers signed events to.'
 ---
 
-## Register a webhook endpoint
+Plinth pushes signed, retried events to the endpoints you register here. For the consumer side —
+verifying signatures and handling events — see [Receiving webhooks](/guides/receiving-webhooks).
 
-```bash
+## Create an endpoint
+
+```bash cURL
 curl -X POST https://api.useplinth.com/v1/webhook-endpoints \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://yourapp.com/webhooks/nomba",
-    "events": ["subscription.renewed", "subscription.past_due", "invoice.paid"]
-  }'
+  -d '{ "url": "https://yourapp.com/api/plinth/webhook", "description": "Production" }'
 ```
-
-Pass `"events": ["*"]` to receive all event types.
-
-**Request body**
 
 <ParamField body="url" type="string" required>
-  The HTTPS endpoint to send events to.
+  The `http(s)` endpoint that receives events.
+</ParamField>
+<ParamField body="description" type="string">
+  Optional human label.
+</ParamField>
+<ParamField body="event_types" type="string[]">
+  Event types to subscribe to. **Omit or pass `[]` to receive all events.**
 </ParamField>
 
-<ParamField body="events" type="array" required>
-  List of event types to subscribe to, or `["*"]` for all events.
-</ParamField>
-
-**Response**
-
-```json
+```json Response (201)
 {
-  "id": "we_01JXYZ...",
-  "url": "https://yourapp.com/webhooks/nomba",
-  "events": ["subscription.renewed", "subscription.past_due", "invoice.paid"],
-  "secret": "whsec_abc123...",
-  "created_at": "2026-06-01T00:00:00Z"
+  "object": "webhook_endpoint",
+  "id": "whep_01KWG...",
+  "url": "https://yourapp.com/api/plinth/webhook",
+  "description": "Production",
+  "enabled": true,
+  "event_types": [],
+  "secret": "whsec_a51e29ea...",
+  "created_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-02T00:00:00Z"
 }
 ```
 
-Store the `secret` — it's shown only once. Use it to verify signatures.
+<Warning>
+  The `secret` (`whsec_…`) is returned **only** on create and rotate. Store it — it signs every
+  delivery to this endpoint. Normal reads omit it.
+</Warning>
 
----
+## List endpoints
 
-## Signature verification
-
-Every webhook request includes `X-Nomba-Signature` in the headers. Verify it before processing.
-
-```typescript
-import { constructEvent } from '@nomba/sdk/webhooks';
-import express from 'express';
-
-const app = express();
-
-app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), (req, res) => {
-  const signature = req.headers['x-nomba-signature'] as string;
-
-  let event;
-  try {
-    event = constructEvent(
-      req.body,
-      signature,
-      process.env.NOMBA_WEBHOOK_SECRET!
-    );
-  } catch (err) {
-    return res.status(400).send('Invalid signature');
-  }
-
-  switch (event.type) {
-    case 'subscription.renewed':
-      // Handle renewal
-      break;
-    case 'invoice.paid':
-      // Handle payment
-      break;
-  }
-
-  res.sendStatus(200);
-});
-```
-
-**Manual verification (without SDK):**
-
-```typescript
-import crypto from 'crypto';
-
-function verifySignature(payload: Buffer, signature: string, secret: string): boolean {
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected)
-  );
-}
-```
-
-Use `crypto.timingSafeEqual` to prevent timing attacks.
-
----
-
-## List webhook endpoints
-
-```bash
+```bash cURL
 curl https://api.useplinth.com/v1/webhook-endpoints \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
 ```
 
----
+Returns `{ "object": "list", "data": [ <webhook_endpoint>, … ] }` (secrets omitted).
 
-## Delete a webhook endpoint
+## Update an endpoint
 
-```bash
-curl -X DELETE https://api.useplinth.com/v1/webhook-endpoints/we_01JXYZ... \
+`PATCH` any of `url`, `description`, `enabled`, `event_types`.
+
+```bash cURL
+curl -X PATCH https://api.useplinth.com/v1/webhook-endpoints/whep_01KWG... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "enabled": false }'
+```
+
+## Rotate the signing secret
+
+Issues a fresh `whsec_…` (returned once) and invalidates the old one.
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/webhook-endpoints/whep_01KWG.../rotate-secret \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
 ```
 
-See [Webhook events](/webhook-events) for the full list of event types and payload examples.
+## Delete an endpoint
+
+```bash cURL
+curl -X DELETE https://api.useplinth.com/v1/webhook-endpoints/whep_01KWG... \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+## Inspect deliveries
+
+Every event × endpoint produces a delivery row with status and retry history — the same data the
+dashboard **Webhooks** view shows.
+
+```bash cURL
+curl https://api.useplinth.com/v1/webhook-endpoints/whep_01KWG.../deliveries \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "object": "list",
+  "counts": { "succeeded": 12, "retrying": 1 },
+  "data": [
+    {
+      "object": "webhook_delivery",
+      "id": "whd_01KWG...",
+      "event_type": "subscription.activated",
+      "status": "succeeded",
+      "attempts": 1,
+      "response_code": 200,
+      "error": null,
+      "next_retry_at": null,
+      "last_attempt_at": "2026-07-02T00:00:01Z",
+      "created_at": "2026-07-02T00:00:00Z"
+    }
+  ]
+}
+```
+
+A failed delivery (non-2xx or timeout) retries with exponential backoff up to 8 attempts, then is
+marked `failed`. `status` is one of `pending | retrying | succeeded | failed`.
+
+## Resend a delivery
+
+Re-queue a delivery for an immediate re-attempt (e.g. after fixing your endpoint).
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/webhook-endpoints/whep_01KWG.../deliveries/whd_01KWG.../resend \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+See the [event catalog](/webhook-events) for every event `type` and its payload.

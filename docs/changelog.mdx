@@ -3,6 +3,16 @@ title: 'Changelog'
 description: 'What changed and when.'
 ---
 
+## v0.11.0 — July 2026
+
+- **Outbound webhooks** — register endpoints (`/v1/webhook-endpoints`) and Plinth pushes signed, retried events to them. Per-endpoint `whsec_` secret (rotate anytime), `Plinth-Signature` HMAC header, exponential-backoff retries (up to 8), a full delivery log, and manual resend. See [Receiving webhooks](/guides/receiving-webhooks).
+- **Checkout-funded upgrades** — `POST /v1/subscriptions/:id/change-checkout` upgrades a subscription with no card on file by collecting the proration via a Nomba checkout; the plan swaps when payment settles.
+- **Cancel & reactivate** — `POST /v1/subscriptions/:id/cancel` (policy-driven: end-of-period keeps access until the period end, immediate cuts now) and `POST /v1/subscriptions/:id/reactivate` to undo a pending cancel. Subscriptions now expose `cancel_at_period_end`, `canceled_at`, `scheduled_change`, and `has_card`.
+- **Dunning recovery via "Update payment"** — generate a `checkout-link` for a `past_due`/`grace`/`delinquent` subscription to settle the outstanding invoice and recover to `active` (emits `subscription.recovered`).
+- **One live subscription per plan-group** (default) — creating a duplicate returns `409 customer_already_subscribed` with the existing id. Opt out with `allow_multiple_subscriptions: true`.
+
+---
+
 ## v0.10.0 — July 2026
 
 - **Plan `lookup_key` (required)** — every plan now carries a stable handle (e.g. `pro_monthly`) you reference instead of its UUID. `GET /v1/plans` returns it; unique per tenant. Your app no longer hardcodes environment-specific plan ids.

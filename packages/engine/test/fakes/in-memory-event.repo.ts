@@ -17,6 +17,10 @@ export class InMemoryEventRepo implements EventRepo {
     this.store.push(event);
   }
 
+  async findById(id: string): Promise<OutboxEvent | null> {
+    return this.store.find((e) => e.id === id) ?? null;
+  }
+
   async findPendingDelivery(limit: number, _tx?: TxContext): Promise<OutboxEvent[]> {
     return this.pending().slice(0, limit);
   }

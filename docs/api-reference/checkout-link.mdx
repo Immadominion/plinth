@@ -1,0 +1,39 @@
+---
+title: 'Create a checkout link'
+description: 'Generate a Nomba-hosted checkout to pay-to-unlock or recover a subscription.'
+---
+
+## POST /v1/subscriptions/:id/checkout-link
+
+Returns a Nomba-hosted checkout link for the subscription. Used in two flows:
+
+1. **Pay-to-unlock** — an `incomplete` subscription (strict `charge_to_activate`): the checkout
+   charges period 1 and tokenizes the card. On settlement the webhook activates the subscription.
+2. **Recover a past-due subscription** (the "Update payment" flow) — for a `past_due` / `grace` /
+   `delinquent` subscription, the checkout settles the outstanding invoice. On settlement the webhook
+   marks the invoice paid and returns the subscription to `active`. Paying by **card** also captures a
+   token (so future renewals auto-charge); paying by **transfer** recovers the period but leaves no
+   token, so the next renewal will need another payment.
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../checkout-link \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+<ParamField body="callbackUrl" type="string">
+  Where Nomba returns the customer after payment. Defaults to the tenant's configured callback URL.
+</ParamField>
+
+```json Response
+{
+  "checkoutLink": "https://pay.nomba.com/...",
+  "orderReference": "plinth_sub_01JABC..._Z64RE7",
+  "customerId": "cus_01JXYZ...",
+  "subscriptionId": "sub_01JABC..."
+}
+```
+
+Redirect the customer to `checkoutLink`. Reconciliation is handled by Plinth on the payment webhook —
+listen for `subscription.activated` / `subscription.recovered` / `invoice.paid` to know when it lands.

@@ -20,6 +20,7 @@ created
 
 | State | What's happening | Customer access | What's next |
 |---|---|---|---|
+| `incomplete` | Strict activation — awaiting first payment | No access | Activates when the checkout payment settles |
 | `trialing` | Free trial running, no charge yet | Full access | Converts to `active` when trial ends |
 | `active` | All good, payments collecting | Full access | Renews at `next_bill_at` |
 | `past_due` | First renewal attempt failed | Full access | Retry schedule starts |
@@ -90,9 +91,41 @@ const subscription = await client.subscriptions.create({
   "current_period_start": "2026-06-01T00:00:00Z",
   "current_period_end": "2026-07-01T00:00:00Z",
   "next_bill_at": "2026-07-01T00:00:00Z",
+  "cancel_at_period_end": false,
+  "canceled_at": null,
+  "has_card": true,
+  "scheduled_change": null,
   "created_at": "2026-06-01T00:00:00Z"
 }
 ```
+
+<ResponseField name="cancel_at_period_end" type="boolean">
+  `true` when the subscription is set to cancel at period end (still active until then). Toggle with
+  [cancel](/api-reference/cancel-subscription) / [reactivate](/api-reference/reactivate-subscription).
+</ResponseField>
+<ResponseField name="has_card" type="boolean">
+  Whether a card token is on file. Transfer-funded subscriptions have none, so renewals need manual
+  payment — a cue to nudge the customer to add a card.
+</ResponseField>
+<ResponseField name="scheduled_change" type="object | null">
+  A pending period-end plan change (e.g. a scheduled downgrade): `{ id, new_plan_id, new_quantity,
+  scheduled_for }`. The current plan runs until `scheduled_for`, then switches.
+</ResponseField>
+
+## One subscription per customer
+
+By default a customer can have **one live subscription per plan-group**. Creating a second while one
+is still live (any non-`canceled` state) returns `409 customer_already_subscribed` with the existing
+subscription's id — reuse it (change its plan, or cancel it) rather than creating a duplicate:
+
+```json 409
+{ "error": { "code": "customer_already_subscribed",
+  "message": "Customer already has a live subscription (sub_01JABC...) in this plan group.",
+  "existing_id": "sub_01JABC..." } }
+```
+
+Integrators that genuinely need concurrent subscriptions can set `allow_multiple_subscriptions: true`
+in their [policy](/presets/overview).
 
 <Note>
 Use idempotency keys on subscription creation. If your request times out and you retry, the same key returns the original response instead of creating a duplicate subscription.

@@ -3,16 +3,17 @@ title: 'Webhook events catalog'
 description: 'Every event type we emit, what triggers it, and what the payload looks like.'
 ---
 
-All events share the same envelope shape:
+All events share the same envelope shape. Switch on `type` and read `data.object`. See
+[Receiving webhooks](/guides/receiving-webhooks) for registration and signature verification.
 
 ```json
 {
   "id": "evt_01JXYZ...",
-  "type": "subscription.renewed",
-  "tenant_id": "ten_abc...",
-  "resource_id": "sub_01JABC...",
-  "data": { ... },
-  "occurred_at": "2026-06-01T08:00:00Z"
+  "object": "event",
+  "api_version": "2026-01-01",
+  "type": "subscription.activated",
+  "created": 1782950400,
+  "data": { "object": { "subscriptionId": "sub_01JABC...", "customerId": "cus_01JXYZ..." } }
 }
 ```
 

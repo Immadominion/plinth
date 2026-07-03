@@ -93,20 +93,29 @@ export function makeCustomersRouter(
     });
   });
 
+  const serializeVa = (va: { id: string; customerId: string; accountNumber: string; bankName: string; accountName: string; accountRef: string; createdAt: Date }) => ({
+    object:         'virtual_account',
+    id:             va.id,
+    customer_id:    va.customerId,
+    account_number: va.accountNumber,
+    bank_name:      va.bankName,
+    account_name:   va.accountName,
+    account_ref:    va.accountRef,
+    created_at:     va.createdAt.toISOString(),
+  });
+
   router.post('/:id/virtual-account', async (c) => {
     const tenantId = c.get('tenantId');
-    const { id } = c.req.param();
-    const va = await provisionVaService.execute({ tenantId, customerId: id });
-    return c.json({
-      object:         'virtual_account',
-      id:             va.id,
-      customer_id:    va.customerId,
-      account_number: va.accountNumber,
-      bank_name:      va.bankName,
-      account_name:   va.accountName,
-      account_ref:    va.accountRef,
-      created_at:     va.createdAt.toISOString(),
-    }, 201);
+    const va = await provisionVaService.execute({ tenantId, customerId: c.req.param('id') });
+    return c.json(serializeVa(va), 201);
+  });
+
+  // Fetch the existing VA without provisioning (404 if none yet).
+  router.get('/:id/virtual-account', async (c) => {
+    const tenantId = c.get('tenantId');
+    const va = await provisionVaService.findExisting(tenantId, c.req.param('id'));
+    if (!va) return c.json({ error: 'no_virtual_account' }, 404);
+    return c.json(serializeVa(va));
   });
 
   return router;

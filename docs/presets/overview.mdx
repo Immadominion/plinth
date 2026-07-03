@@ -52,6 +52,27 @@ await client.tenant.applyPreset('saas_standard');
 
 Valid preset names: `saas_standard`, `lenient`, `strict`, `transfer_first`, `postpaid`.
 
+## Override individual knobs
+
+`PUT /v1/policy` to change any knob without switching preset:
+
+| Knob | Values | Controls |
+|---|---|---|
+| `activation_strategy` | `activate_then_charge` · `charge_to_activate` | Access before vs after first payment |
+| `upgrade_strategy` | `immediate_prorated` · `at_period_end` | When an upgrade takes effect |
+| `downgrade_strategy` | `at_period_end` · `immediate_credit` | When a downgrade takes effect |
+| `change_during_dunning` | `gate_upgrades` · `block_all` · `allow_all` | Plan changes while past due |
+| `cancel_policy` | `end_of_period` · `immediate` | When a cancel takes effect |
+| `grace_days` | integer | Grace window before `delinquent` |
+| `allow_multiple_subscriptions` | `false` (default) · `true` | Allow a customer more than one live subscription per plan-group |
+
+```bash
+curl -X PUT https://api.useplinth.com/v1/policy \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "cancel_policy": "immediate", "grace_days": 3 }'
+```
+
 ## After applying
 
 The preset updates your TenantPolicy. Existing subscriptions aren't affected retroactively — only new billing cycles apply the new rules. If you need to change behaviour for an in-flight subscription, contact support or use a per-subscription override.

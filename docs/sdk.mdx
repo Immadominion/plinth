@@ -44,12 +44,13 @@ client.customers.getVirtualAccount(id)        // GET /v1/customers/:id/virtual-a
 client.subscriptions.create(body, opts?)   // POST /v1/subscriptions
 client.subscriptions.get(id)               // GET /v1/subscriptions/:id
 client.subscriptions.status(id)            // GET /v1/subscriptions/:id/status
-client.subscriptions.cancel(id, body?)     // POST /v1/subscriptions/:id/cancel
-client.subscriptions.pause(id)             // POST /v1/subscriptions/:id/pause
-client.subscriptions.resume(id)            // POST /v1/subscriptions/:id/resume
+client.subscriptions.cancel(id)            // POST /v1/subscriptions/:id/cancel  (policy-driven)
+client.subscriptions.reactivate(id)        // POST /v1/subscriptions/:id/reactivate
 client.subscriptions.previewChange(id, body)   // POST /v1/subscriptions/:id/preview-change
-client.subscriptions.changePlan(id, body)      // POST /v1/subscriptions/:id/change-plan
-client.subscriptions.cancelScheduledChange(id) // DELETE /v1/subscriptions/:id/scheduled-change
+client.subscriptions.change(id, body)          // POST /v1/subscriptions/:id/change
+client.subscriptions.changeCheckout(id, body)  // POST /v1/subscriptions/:id/change-checkout
+client.subscriptions.checkoutLink(id, body?)   // POST /v1/subscriptions/:id/checkout-link
+client.subscriptions.cancelScheduledChange(id, changeId) // DELETE /v1/subscriptions/:id/scheduled-change/:changeId
 ```
 
 ### `client.plans`
@@ -70,35 +71,40 @@ client.invoices.lineItems(id)              // GET /v1/invoices/:id/line-items
 
 ## Webhook handler
 
+`constructEvent` verifies the `Plinth-Signature` header against your endpoint secret (`whsec_…`) and
+returns the parsed event. Pass the **raw body**. For a framework-agnostic version and the exact
+signing scheme, see [Receiving webhooks](/guides/receiving-webhooks).
+
 ```typescript
 import { constructEvent } from '@nomba/sdk/webhooks';
 import express from 'express';
 
 const app = express();
 
-app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), async (req, res) => {
-  const event = constructEvent(
-    req.body,
-    req.headers['x-nomba-signature'] as string,
-    process.env.NOMBA_WEBHOOK_SECRET!
-  );
+app.post('/api/plinth/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  let event;
+  try {
+    event = constructEvent(
+      req.body,                                  // raw body
+      req.headers['plinth-signature'] as string, // t=<unix>,v1=<hmac>
+      process.env.PLINTH_WEBHOOK_SECRET!,        // whsec_…
+    );
+  } catch {
+    return res.status(401).send('invalid signature');
+  }
 
   switch (event.type) {
-    case 'subscription.renewed':
-      // event.data is fully typed — TypeScript knows the shape
-      await grantFullAccess(event.data.customer_id);
+    case 'subscription.activated':
+      await grantFullAccess(event.data.object.customerId);
       break;
-
     case 'subscription.past_due':
-      await showPaymentWarning(event.data.customer_id);
+      await showPaymentWarning(event.data.object.customerId);
       break;
-
     case 'subscription.delinquent':
-      await revokeAccess(event.data.customer_id);
+      await revokeAccess(event.data.object.customerId);
       break;
-
-    case 'transfer.matched':
-      console.log(`Transfer matched for customer ${event.data.customer_id}`);
+    case 'subscription.recovered':
+      await restoreAccess(event.data.object.customerId);
       break;
   }
 
@@ -106,7 +112,7 @@ app.post('/webhooks/nomba', express.raw({ type: 'application/json' }), async (re
 });
 ```
 
-`constructEvent` throws `NombaSignatureError` if the signature doesn't match. Always handle that case.
+`constructEvent` throws if the signature doesn't match — return `401` in that case.
 
 ## Error handling
 

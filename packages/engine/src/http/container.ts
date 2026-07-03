@@ -47,6 +47,11 @@ import { DrizzleClaimTokenRepo } from '../db/claim-token.repo.js';
 import { DrizzleApplicationRepo } from '../db/application.repo.js';
 import { DrizzleCardTokenRepo } from '../db/card-token.repo.js';
 import { CardTokenizationService } from '../services/card-token.service.js';
+import { DrizzleWebhookEndpointRepo } from '../db/webhook-endpoint.repo.js';
+import { DrizzleWebhookDeliveryRepo } from '../db/webhook-delivery.repo.js';
+import { WebhookEndpointService } from '../services/webhook-endpoint.service.js';
+import { WebhookDispatchService } from '../services/webhook-dispatch.service.js';
+import { TransferPaymentService } from '../services/transfer-payment.service.js';
 
 export interface Container {
   sandboxService: SandboxService;
@@ -71,6 +76,7 @@ export interface Container {
   planChangeService: PlanChangeService;
   subscriptionLifecycleService: SubscriptionLifecycleService;
   provisionVaService: ProvisionVirtualAccountService;
+  transferPaymentService: TransferPaymentService;
   reconService: TransferReconService;
   subscriptionRepo: SubscriptionRepo;
   scheduledChangeRepo: ScheduledChangeRepo;
@@ -81,6 +87,9 @@ export interface Container {
   jobQueue: JobQueue;
   entitlementsService: EntitlementsService;
   policyService: PolicyService;
+  webhookEndpointService: WebhookEndpointService;
+  webhookDispatchService: WebhookDispatchService;
+  webhookDeliveryRepo: DrizzleWebhookDeliveryRepo;
   clock: RealClock | TestClock;
   close(): Promise<void>;
 }
@@ -149,6 +158,7 @@ export function buildContainer(): Container {
     subscriptionRepo, policyRepo, scheduledChangeRepo, eventRepo, uow, clock,
   );
   const provisionVaService = new ProvisionVirtualAccountService(nomba, virtualAccountRepo, customerRepo, clock);
+  const transferPaymentService = new TransferPaymentService(subscriptionRepo, planRepo, invoiceRepo, provisionVaService);
   const reconService = new TransferReconService(
     virtualAccountRepo, inboundTransferRepo, suspenseRepo, invoiceRepo,
     eventRepo, postLedgerEntryService, uow, clock,
@@ -170,6 +180,11 @@ export function buildContainer(): Container {
 
   const cardTokenRepo = new DrizzleCardTokenRepo();
   const cardTokenService = new CardTokenizationService(cardTokenRepo, customerRepo);
+
+  const webhookEndpointRepo = new DrizzleWebhookEndpointRepo();
+  const webhookDeliveryRepo = new DrizzleWebhookDeliveryRepo();
+  const webhookEndpointService = new WebhookEndpointService(webhookEndpointRepo, clock);
+  const webhookDispatchService = new WebhookDispatchService(eventRepo, webhookEndpointRepo, webhookDeliveryRepo, clock);
 
   return {
     sandboxService,
@@ -194,6 +209,7 @@ export function buildContainer(): Container {
     planChangeService,
     subscriptionLifecycleService,
     provisionVaService,
+    transferPaymentService,
     reconService,
     subscriptionRepo,
     scheduledChangeRepo,
@@ -204,6 +220,9 @@ export function buildContainer(): Container {
     jobQueue,
     entitlementsService,
     policyService,
+    webhookEndpointService,
+    webhookDispatchService,
+    webhookDeliveryRepo,
     clock,
     async close() {
       await jobQueue.close();

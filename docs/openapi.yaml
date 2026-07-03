@@ -30,6 +30,8 @@ tags:
     description: Dedicated bank account numbers for customers who pay by transfer.
   - name: Invoices
     description: Created at each billing cycle. Tracks what a customer owes for a period.
+  - name: Webhooks
+    description: Register endpoints that receive signed, retried events. See Receiving webhooks.
   - name: Admin
     description: Test clock control, billing tick, and suspense resolution. Test-mode only.
 
@@ -204,7 +206,7 @@ components:
           example: sub_01JABC...
         state:
           type: string
-          enum: [active, trialing, past_due, grace, delinquent, paused, canceled]
+          enum: [incomplete, active, trialing, past_due, grace, delinquent, paused, canceled]
           example: active
         current_period_start:
           type: string
@@ -219,6 +221,27 @@ components:
         next_bill_at:
           type: string
           format: date-time
+        cancel_at_period_end:
+          type: boolean
+          description: True when the subscription is set to cancel at period end (still active until then).
+          example: false
+        canceled_at:
+          type: string
+          format: date-time
+          nullable: true
+        has_card:
+          type: boolean
+          description: Whether a card token is on file. Transfer-funded subs have none.
+          example: true
+        scheduled_change:
+          type: object
+          nullable: true
+          description: A pending period-end plan change (e.g. a scheduled downgrade).
+          properties:
+            id: { type: string }
+            new_plan_id: { type: string }
+            new_quantity: { type: integer }
+            scheduled_for: { type: string, format: date-time, nullable: true }
 
     PlanChangePreview:
       type: object
@@ -397,6 +420,59 @@ components:
               type: string
             email:
               type: string
+
+    CancelResult:
+      type: object
+      properties:
+        object: { type: string, enum: [subscription] }
+        subscriptionId: { type: string, example: sub_01JABC... }
+        state:
+          type: string
+          enum: [incomplete, active, trialing, past_due, grace, delinquent, paused, canceled]
+        cancelAtPeriodEnd: { type: boolean }
+        effectiveAt:
+          type: string
+          format: date-time
+          description: When access ends — now for immediate, or the period end for end_of_period.
+        policy:
+          type: string
+          description: The cancel policy applied (end_of_period, immediate, or n/a for reactivate).
+
+    WebhookEndpoint:
+      type: object
+      properties:
+        object: { type: string, enum: [webhook_endpoint] }
+        id: { type: string, example: whep_01KWG... }
+        url: { type: string }
+        description: { type: string, nullable: true }
+        enabled: { type: boolean }
+        event_types:
+          type: array
+          items: { type: string }
+          description: Empty = all events.
+        secret:
+          type: string
+          description: Returned only on create and rotate.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    WebhookDelivery:
+      type: object
+      properties:
+        object: { type: string, enum: [webhook_delivery] }
+        id: { type: string, example: whd_01KWG... }
+        endpoint_id: { type: string }
+        event_id: { type: string }
+        event_type: { type: string }
+        status:
+          type: string
+          enum: [pending, retrying, succeeded, failed]
+        attempts: { type: integer }
+        response_code: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+        next_retry_at: { type: string, format: date-time, nullable: true }
+        last_attempt_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
 
 paths:
   # ─────────────────────────────────────────────────────────── Sandbox ──────
@@ -1006,6 +1082,237 @@ paths:
                   canceled:
                     type: boolean
                     example: true
+
+  /v1/subscriptions/{id}/checkout-link:
+    post:
+      operationId: create-checkout-link
+      summary: Create a checkout link
+      description: >
+        Returns a Nomba-hosted checkout link. Used to pay-to-unlock an incomplete subscription, or to
+        settle the outstanding invoice on a past_due/grace/delinquent subscription ("Update payment").
+        Reconciliation happens on the payment webhook.
+      tags: [Subscriptions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: sub_01JABC... }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callbackUrl: { type: string, description: Where Nomba returns the customer after payment. }
+      responses:
+        "200":
+          description: Checkout link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkoutLink: { type: string }
+                  orderReference: { type: string }
+                  customerId: { type: string }
+                  subscriptionId: { type: string }
+
+  /v1/subscriptions/{id}/change-checkout:
+    post:
+      operationId: change-checkout
+      summary: Checkout-funded plan change
+      description: >
+        For an upgrade when the customer has no card on file: collect the prorated amount via a
+        Nomba-hosted checkout. The plan swaps when the payment settles (subscription.upgraded).
+        Lateral/downgrade changes need no payment — use /change instead.
+      tags: [Subscriptions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: sub_01JABC... }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id: { type: string, example: pln_01STANDARD... }
+      responses:
+        "200":
+          description: Checkout link for the pending change
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkoutLink: { type: string }
+                  orderReference: { type: string }
+                  customerId: { type: string }
+                  subscriptionId: { type: string }
+                  dueMinor: { type: string, description: Prorated amount collected now (kobo). }
+                  direction: { type: string, enum: [upgrade] }
+                  newPlanName: { type: string }
+
+  /v1/subscriptions/{id}/cancel:
+    post:
+      operationId: cancel-subscription
+      summary: Cancel a subscription
+      description: >
+        No body. Follows the tenant cancel_policy: end_of_period keeps the subscription active until
+        the period end (then cancels at the renewal tick); immediate cancels now. Any pending plan
+        change is dropped.
+      tags: [Subscriptions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: sub_01JABC... }
+      responses:
+        "200":
+          description: Cancel accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CancelResult" }
+
+  /v1/subscriptions/{id}/reactivate:
+    post:
+      operationId: reactivate-subscription
+      summary: Reactivate a subscription
+      description: >
+        Undo a still-pending end_of_period cancel so the subscription keeps renewing. No body. Returns
+        409 if the subscription has already ended (start a new one instead).
+      tags: [Subscriptions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: sub_01JABC... }
+      responses:
+        "200":
+          description: Cancel reverted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CancelResult" }
+
+  # ──────────────────────────────────────────────────────── Webhooks ────────
+  /v1/webhook-endpoints:
+    post:
+      operationId: create-webhook-endpoint
+      summary: Create an endpoint
+      description: The secret (whsec_) is returned only here and on rotate — store it.
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, example: https://yourapp.com/api/plinth/webhook }
+                description: { type: string }
+                event_types:
+                  type: array
+                  items: { type: string }
+                  description: Omit or pass [] to receive all events.
+      responses:
+        "201":
+          description: Endpoint created (with secret)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookEndpoint" }
+    get:
+      operationId: list-webhook-endpoints
+      summary: List endpoints
+      tags: [Webhooks]
+      responses:
+        "200":
+          description: List of endpoints (secrets omitted)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, enum: [list] }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEndpoint" }
+
+  /v1/webhook-endpoints/{id}:
+    patch:
+      operationId: update-webhook-endpoint
+      summary: Update an endpoint
+      tags: [Webhooks]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: whep_01KWG... }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string }
+                description: { type: string }
+                enabled: { type: boolean }
+                event_types: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: Updated endpoint
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookEndpoint" }
+    delete:
+      operationId: delete-webhook-endpoint
+      summary: Delete an endpoint
+      tags: [Webhooks]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: whep_01KWG... }
+      responses:
+        "200":
+          description: Deleted
+
+  /v1/webhook-endpoints/{id}/rotate-secret:
+    post:
+      operationId: rotate-webhook-secret
+      summary: Rotate the signing secret
+      description: Issues a fresh whsec_ (returned once) and invalidates the old one.
+      tags: [Webhooks]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: whep_01KWG... }
+      responses:
+        "200":
+          description: Endpoint with new secret
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookEndpoint" }
+
+  /v1/webhook-endpoints/{id}/deliveries:
+    get:
+      operationId: list-webhook-deliveries
+      summary: List deliveries for an endpoint
+      tags: [Webhooks]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: whep_01KWG... }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 50 } }
+      responses:
+        "200":
+          description: Deliveries with status counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, enum: [list] }
+                  counts:
+                    type: object
+                    additionalProperties: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookDelivery" }
+
+  /v1/webhook-endpoints/{id}/deliveries/{deliveryId}/resend:
+    post:
+      operationId: resend-webhook-delivery
+      summary: Resend a delivery
+      description: Re-queue a delivery for an immediate re-attempt.
+      tags: [Webhooks]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: whep_01KWG... }
+        - { name: deliveryId, in: path, required: true, schema: { type: string }, example: whd_01KWG... }
+      responses:
+        "200":
+          description: Delivery re-queued
 
   # ─────────────────────────────────────────────────────────── Admin ────────
   /admin/clock:

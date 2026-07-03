@@ -16,6 +16,7 @@ export interface OutboxEvent {
 
 export interface EventRepo {
   append(event: OutboxEvent, tx: TxContext): Promise<void>;
+  findById(id: string): Promise<OutboxEvent | null>;
   findPendingDelivery(limit: number, tx?: TxContext): Promise<OutboxEvent[]>;
   markDelivered(eventIds: string[], tx?: TxContext): Promise<void>;
 }
@@ -53,6 +54,11 @@ export class DrizzleEventRepo implements EventRepo {
       occurredAt:   event.occurredAt,
       createdAt:    event.createdAt,
     });
+  }
+
+  async findById(id: string): Promise<OutboxEvent | null> {
+    const rows = await db.select().from(events).where(eq(events.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
   }
 
   async findPendingDelivery(limit: number, tx?: TxContext): Promise<OutboxEvent[]> {

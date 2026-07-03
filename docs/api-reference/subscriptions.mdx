@@ -109,43 +109,57 @@ curl https://api.useplinth.com/v1/subscriptions/sub_01JABC.../status \
 
 ## POST /v1/subscriptions/:id/cancel
 
-Cancel a subscription. By default, the subscription stays active until the current period ends, then cancels.
+Cancel a subscription. **No body** — the behaviour follows the tenant's `cancel_policy`:
 
-<CodeGroup>
+- **`end_of_period`** (default) — the subscription stays **active** (access retained) and won't renew;
+  it moves to `canceled` at the next renewal tick. Any pending plan change is dropped.
+- **`immediate`** — the subscription moves to `canceled` now; access ends immediately.
+
 ```bash cURL
 curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../cancel \
-  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"immediately": false}'
-```
-
-```typescript Node.js
-await client.subscriptions.cancel('sub_01JABC...', { immediately: false });
-```
-</CodeGroup>
-
-<ParamField body="immediately" type="boolean">
-  `false` (default) — cancel at period end. `true` — cancel and revoke access now.
-</ParamField>
-
----
-
-## POST /v1/subscriptions/:id/pause
-
-Pause a subscription. Billing stops. Access is revoked immediately.
-
-```bash
-curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../pause \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
 ```
 
+```json Response
+{
+  "object": "subscription",
+  "subscriptionId": "sub_01JABC...",
+  "state": "active",
+  "cancelAtPeriodEnd": true,
+  "effectiveAt": "2026-08-01T00:00:00Z",
+  "policy": "end_of_period"
+}
+```
+
+<ResponseField name="cancelAtPeriodEnd" type="boolean">
+  `true` when the subscription is canceling at period end (still active until `effectiveAt`).
+  `false` on an immediate cancel.
+</ResponseField>
+<ResponseField name="effectiveAt" type="string">
+  When access actually ends — `now` for an immediate cancel, or the current period end for
+  `end_of_period`.
+</ResponseField>
+
 ---
 
-## POST /v1/subscriptions/:id/resume
+## POST /v1/subscriptions/:id/reactivate
 
-Resume a paused subscription. Billing restarts. If the pause was mid-period, the remaining days are added to the current period.
+Undo a still-pending `end_of_period` cancel — the subscription keeps renewing. No body. Only valid
+while the subscription is still active (before it has actually ended); on an already-`canceled`
+subscription this returns `409` — start a new subscription instead.
 
-```bash
-curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../resume \
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../reactivate \
   -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "object": "subscription",
+  "subscriptionId": "sub_01JABC...",
+  "state": "active",
+  "cancelAtPeriodEnd": false,
+  "effectiveAt": "2026-08-01T00:00:00Z",
+  "policy": "n/a"
+}
 ```

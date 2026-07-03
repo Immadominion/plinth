@@ -1,0 +1,26 @@
+---
+title: 'Reactivate a subscription'
+description: 'Undo a pending end-of-period cancel so the subscription keeps renewing.'
+---
+
+## POST /v1/subscriptions/:id/reactivate
+
+Undo a still-pending `end_of_period` cancel — the subscription keeps renewing. **No body.** Valid only
+while the subscription is still active (before it has actually ended). On an already-`canceled`
+subscription this returns `409` — start a new subscription instead.
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../reactivate \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "object": "subscription",
+  "subscriptionId": "sub_01JABC...",
+  "state": "active",
+  "cancelAtPeriodEnd": false,
+  "effectiveAt": "2026-08-01T00:00:00Z",
+  "policy": "n/a"
+}
+```

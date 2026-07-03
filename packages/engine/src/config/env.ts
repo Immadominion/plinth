@@ -33,6 +33,9 @@ const EnvSchema = z.object({
   // Public URL where Nomba posts webhooks (the cloudflared tunnel → this engine).
   // Used as the callbackUrl on tokenized-card charges and to document the webhook destination.
   WEBHOOK_BASE_URL: z.string().url().default('https://api.useplinth.xyz'),
+
+  // How often the outbound-webhook dispatcher runs (fan-out + deliver due retries).
+  WEBHOOK_DISPATCH_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

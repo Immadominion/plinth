@@ -1,0 +1,90 @@
+---
+title: 'Receiving webhooks'
+description: 'React to Plinth events in your app — register an endpoint, verify the signature, handle the event.'
+---
+
+Plinth **pushes** signed, retried events to your endpoints so you never have to poll. Every state
+change (activation, renewal, dunning, cancellation, invoice paid…) is written to a transactional
+outbox and delivered to each of your registered endpoints.
+
+<Steps>
+  <Step title="Register an endpoint">
+    ```bash
+    curl -X POST https://api.useplinth.xyz/v1/webhook-endpoints \
+      -H "Authorization: Bearer $PLINTH_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{ "url": "https://yourapp.com/api/plinth/webhook" }'
+    ```
+
+    The response includes a `secret` (`whsec_…`) **shown only once** — store it. It signs every
+    delivery to this endpoint. You can also add endpoints and rotate secrets from the dashboard
+    (**Webhooks**). Pass `event_types` to subscribe to a subset; omit it to receive everything.
+  </Step>
+
+  <Step title="Verify the signature and handle the event">
+    Each request carries a `Plinth-Signature: t=<unix>,v1=<hmac>` header. The signature is
+    `HMAC-SHA256("<t>.<raw body>")` keyed by your endpoint secret. **Verify against the raw body,
+    before parsing JSON.**
+
+    ```ts Next.js — app/api/plinth/webhook/route.ts
+    import { createHmac, timingSafeEqual } from 'crypto';
+
+    const SECRET = process.env.PLINTH_WEBHOOK_SECRET!;
+
+    function verify(header: string | null, raw: string): boolean {
+      if (!header) return false;
+      const p = Object.fromEntries(header.split(',').map((x) => x.split('=')));
+      const t = parseInt(p.t ?? '', 10);
+      if (!t || Math.abs(Date.now() / 1000 - t) > 300) return false; // 5-min tolerance
+      const expected = createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex');
+      const a = Buffer.from(expected), b = Buffer.from(p.v1 ?? '');
+      return a.length === b.length && timingSafeEqual(a, b);
+    }
+
+    export async function POST(req: Request) {
+      const raw = await req.text(); // raw body — required for verification
+      if (!verify(req.headers.get('plinth-signature'), raw)) {
+        return Response.json({ error: 'invalid signature' }, { status: 401 });
+      }
+      const event = JSON.parse(raw);
+      switch (event.type) {
+        case 'subscription.activated':
+        case 'invoice.paid':
+          // update your copy of the customer's state
+          break;
+      }
+      return Response.json({ received: true });
+    }
+    ```
+
+    Return a `2xx` quickly to acknowledge. Any non-2xx (or a timeout) is retried.
+  </Step>
+</Steps>
+
+## The event envelope
+
+Every delivery has the same shape. Your handler switches on `type` and reads `data.object`.
+
+```json
+{
+  "id": "evt_01KWG…",
+  "object": "event",
+  "api_version": "2026-01-01",
+  "type": "subscription.activated",
+  "created": 1782950400,
+  "data": { "object": { "subscriptionId": "sub_01…", "customerId": "cus_01…" } }
+}
+```
+
+See the [event catalog](/webhook-events) for every `type` and its `data.object`.
+
+## Delivery, retries & idempotency
+
+- **Retries.** A failed delivery (non-2xx or timeout) is retried with exponential backoff — up to
+  8 attempts — then marked `failed`. Watch every attempt under **Webhooks → deliveries**, and
+  **Resend** any delivery manually.
+- **Idempotency.** Deliveries can arrive more than once. Treat `event.id` as an idempotency key —
+  ignore an id you've already processed.
+- **Ordering.** Events are delivered roughly in order but not guaranteed; rely on the resource's
+  current state (or `created`) rather than assuming strict order.
+- **Security.** Always verify the signature. Reject anything that doesn't match your endpoint secret.

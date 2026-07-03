@@ -1,0 +1,37 @@
+---
+title: 'Cancel a subscription'
+description: 'Cancel now or at period end, following the tenant cancel policy.'
+---
+
+## POST /v1/subscriptions/:id/cancel
+
+**No body** — the behaviour follows the tenant's `cancel_policy`:
+
+- **`end_of_period`** (default) — the subscription stays **active** (access retained) and won't renew;
+  it moves to `canceled` at the next renewal tick. Any pending plan change is dropped.
+- **`immediate`** — the subscription moves to `canceled` now; access ends immediately.
+
+```bash cURL
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../cancel \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY"
+```
+
+```json Response
+{
+  "object": "subscription",
+  "subscriptionId": "sub_01JABC...",
+  "state": "active",
+  "cancelAtPeriodEnd": true,
+  "effectiveAt": "2026-08-01T00:00:00Z",
+  "policy": "end_of_period"
+}
+```
+
+<ResponseField name="cancelAtPeriodEnd" type="boolean">
+  `true` when canceling at period end (still active until `effectiveAt`); `false` on an immediate cancel.
+</ResponseField>
+<ResponseField name="effectiveAt" type="string">
+  When access ends — `now` for immediate, or the current period end for `end_of_period`.
+</ResponseField>
+
+Undo a still-pending `end_of_period` cancel with [reactivate](/api-reference/reactivate-subscription).

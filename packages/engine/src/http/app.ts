@@ -18,6 +18,8 @@ import { makeWebhookRouter } from './routes/webhook.js';
 import { makeSandboxRouter } from './routes/sandbox.js';
 import { makeApplicationsPublicRouter, makeApplicationsAdminRouter } from './routes/applications.js';
 import { makeCheckoutRouter } from './routes/checkout.js';
+import { makeWebhookEndpointsRouter } from './routes/webhook-endpoints.js';
+import { makeTransferRouter } from './routes/transfer.js';
 import { makeAuthRouter } from './routes/auth.js';
 import { makeApiKeysRouter } from './routes/keys.js';
 import { env } from '../config/env.js';
@@ -48,6 +50,13 @@ export function buildApp(container: Container): Hono {
   app.route('/admin/suspense', makeSuspenseRouter(container.reconService, container.suspenseRepo));
   app.route('/webhooks', makeWebhookRouter(container.reconService, container.cardTokenService, container.tickService, container.planChangeService, container.nomba));
 
+  // Admin: manually run an outbound-webhook dispatch cycle (fan-out + deliver due). The scheduler
+  // does this automatically; this lets demos/tests flush immediately.
+  app.post('/admin/webhooks/dispatch', async (c) => {
+    const result = await container.webhookDispatchService.tick();
+    return c.json({ object: 'dispatch_result', ...result });
+  });
+
   const bootstrapRouter = new Hono();
   bootstrapRouter.use('*', idempotencyMiddleware);
   bootstrapRouter.route('/', makeTenantsRouter(container.createTenantService));
@@ -62,8 +71,10 @@ export function buildApp(container: Container): Hono {
   v1.route('/plans',         makePlansRouter(container.createPlanService, container.updatePlanService, container.deletePlanService, container.planRepo));
   v1.route('/subscriptions', makeSubscriptionsRouter(container.createSubscriptionService, container.planChangeService, container.entitlementsService, container.subscriptionRepo, container.scheduledChangeRepo, container.subscriptionLifecycleService));
   v1.route('/subscriptions', makeCheckoutRouter(container.nomba, container.subscriptionRepo, container.customerRepo, container.planRepo, container.planChangeService));
+  v1.route('/subscriptions', makeTransferRouter(container.transferPaymentService));
   v1.route('/invoices',     makeInvoicesRouter(container.invoiceRepo));
   v1.route('/policy',       makePolicyRouter(container.policyService));
+  v1.route('/webhook-endpoints', makeWebhookEndpointsRouter(container.webhookEndpointService, container.webhookDeliveryRepo));
   v1.route('/me',           makeMeRouter(container.tenantRepo));
   v1.route('/keys',         makeApiKeysRouter(container.tenantRepo, container.clock));
 

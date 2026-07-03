@@ -96,3 +96,26 @@ During `past_due` or `grace`, the customer can pay the outstanding invoice by ba
 - Restore access immediately
 - Send a "welcome back" confirmation email
 - Clear any warning states in your UI
+
+## Recovering with "Update payment"
+
+Automatic retries only work when there's a **card token** to charge. For a subscription with no card
+on file (e.g. it was funded by bank transfer), or when the customer wants to pay right now, generate
+a checkout and let them settle the outstanding invoice:
+
+```bash
+curl -X POST https://api.useplinth.com/v1/subscriptions/sub_01JABC.../checkout-link \
+  -H "Authorization: Bearer sk_test_DOCS_SHARED_KEY" -d '{}'
+```
+
+Redirect the customer to the returned `checkoutLink`. On settlement Plinth marks the outstanding
+invoice paid, returns the subscription to `active`, advances it into the paid period, and emits
+`subscription.recovered`. This works from `past_due`, `grace`, **or** `delinquent`.
+
+<Note>
+  Paying by **card** captures a token, so future renewals auto-charge and dunning won't recur. Paying
+  by **transfer** recovers the current period but leaves no token — the next renewal will prompt for
+  payment again. Surface an "add a card to auto-renew" nudge for transfer-funded subscriptions.
+</Note>
+
+See [Create a checkout link](/api-reference/checkout-link) for the full response.
