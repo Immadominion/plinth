@@ -170,6 +170,7 @@ export class TickService {
         createdAt:    now,
       }, tx);
     });
+    await this.notify?.trialEnded({ tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id });
   }
 
   // Strict: attempt the first charge before granting access. Success → active; no card or a
@@ -262,6 +263,7 @@ export class TickService {
         createdAt:    now,
       }, tx);
     });
+    await this.notify?.trialEnded({ tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id });
   }
 
   private async moveToIncomplete(sub: Subscription, now: Date, reason: string): Promise<void> {
@@ -366,7 +368,7 @@ export class TickService {
         occurredAt: now, createdAt: now,
       }, tx);
     });
-    await this.notify?.recovered(tenantId, sub.customerId);
+    await this.notify?.recovered({ tenantId, customerId: sub.customerId, subscriptionId: sub.id, invoiceId: invoice?.id ?? null, occurredAt: now });
     return true;
   }
 
@@ -435,6 +437,13 @@ export class TickService {
         createdAt:    now,
       }, tx);
     });
+
+    // First activation → welcome; an ongoing renewal payment → receipt.
+    if (activate) {
+      await this.notify?.activated({ tenantId: sub.tenantId, customerId: sub.customerId, invoiceId, amountMinor: amount });
+    } else {
+      await this.notify?.paymentReceipt({ tenantId: sub.tenantId, customerId: sub.customerId, invoiceId, amountMinor: amount });
+    }
   }
 
   private async renewOne(sub: Subscription, now: Date): Promise<boolean> {
@@ -452,6 +461,7 @@ export class TickService {
           occurredAt: now, createdAt: now,
         }, tx);
       });
+      await this.notify?.canceled({ tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id });
       return false;
     }
 
@@ -518,8 +528,8 @@ export class TickService {
           occurredAt: now, createdAt: now,
         }, tx);
       });
-      // Flagship SMS: tell the transfer customer their account + amount so they can pay ahead.
-      await this.notify?.paymentDue(sub.tenantId, sub.customerId, amountDue);
+      // Flagship notification: tell the transfer customer their account + amount so they can pay ahead.
+      await this.notify?.paymentDue({ tenantId: sub.tenantId, customerId: sub.customerId, invoiceId, amountMinor: amountDue });
       return true;
     }
 
@@ -656,7 +666,7 @@ export class TickService {
         createdAt:    now,
       }, tx);
     });
-    await this.notify?.pastDue(sub.tenantId, sub.customerId);
+    await this.notify?.pastDue({ tenantId: sub.tenantId, customerId: sub.customerId, invoiceId });
   }
 
   private async advanceToGrace(sub: Subscription, now: Date): Promise<void> {
@@ -882,7 +892,7 @@ export class TickService {
               createdAt:    now,
             }, tx);
           });
-          await this.notify?.delinquent(sub.tenantId, sub.customerId);
+          await this.notify?.delinquent({ tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id, occurredAt: now });
           expired++;
         } catch { /* continue */ }
       }
@@ -918,6 +928,7 @@ export class TickService {
             occurredAt: now, createdAt: now,
           }, tx);
         });
+        await this.notify?.canceled({ tenantId: sub.tenantId, customerId: sub.customerId, subscriptionId: sub.id });
         canceled++;
       } catch { /* continue */ }
     }

@@ -5,6 +5,9 @@ export interface SendEmailOptions {
   subject: string;
   html: string;
   text?: string;
+  // Overrides the visible From name for this one send (e.g. the tenant's brand for a
+  // customer-facing notification, so a Nollybox customer doesn't see "Plinth" in their inbox).
+  fromName?: string;
 }
 
 export interface EmailService {
@@ -13,10 +16,12 @@ export interface EmailService {
 
 export class NodemailerEmailService implements EmailService {
   private readonly transporter: Transporter;
-  private readonly fromAddress: string;
+  private readonly user: string;
+  private readonly defaultFromName: string;
 
   constructor(user: string, pass: string, fromName = 'Plinth') {
-    this.fromAddress = `"${fromName}" <${user}>`;
+    this.user = user;
+    this.defaultFromName = fromName;
     this.transporter = createTransport({
       service: 'gmail',
       auth: { user, pass },
@@ -24,8 +29,9 @@ export class NodemailerEmailService implements EmailService {
   }
 
   async send(opts: SendEmailOptions): Promise<void> {
+    const fromName = opts.fromName ?? this.defaultFromName;
     await this.transporter.sendMail({
-      from:    this.fromAddress,
+      from:    `"${fromName}" <${this.user}>`,
       to:      opts.to,
       subject: opts.subject,
       html:    opts.html,
@@ -200,4 +206,44 @@ export function approvalEmail(params: {
   const text = `You're approved, ${businessName}!\n\nTenant ID: ${tenantId}\nAPI Key: ${apiKey}\n\nLog in at: ${loginUrl}\n\nKeep your API key safe — it grants full access to your workspace.`;
 
   return { to: '', subject: `Your Plinth API key is ready`, html, text };
+}
+
+// Customer-facing billing notification email. Branded with the TENANT's name (not "Plinth") so the
+// end customer sees the business they subscribed to. `tone` shades the accent bar for the moment.
+export function billingNotificationEmail(params: {
+  brand: string;
+  subject: string;
+  heading: string;
+  body: string;
+  tone?: 'info' | 'warn' | 'success';
+}): SendEmailOptions {
+  const { brand, subject, heading, body } = params;
+  const accent = params.tone === 'warn' ? '#b45309' : params.tone === 'success' ? '#047857' : '#4f46e5';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+        <tr><td style="background:${accent};padding:24px 32px;">
+          <p style="margin:0;font-size:19px;font-weight:700;color:#fff;letter-spacing:-0.3px;">${esc(brand)}</p>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h1 style="margin:0 0 12px;font-size:21px;font-weight:700;color:#111827;">${esc(heading)}</h1>
+          <p style="margin:0;color:#374151;font-size:15px;line-height:1.65;">${esc(body)}</p>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #f3f4f6;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">You're receiving this because you have a subscription with ${esc(brand)}.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { to: '', subject, html, text: `${heading}\n\n${body}`, fromName: brand };
 }

@@ -133,6 +133,39 @@ export const events = pgTable(
   ],
 );
 
+// Dedup log for customer-facing notifications. One row per (tenant, dedupe_key); a unique index
+// makes re-sends a no-op, so repeated billing ticks never spam the same customer twice.
+export const notificationLog = pgTable(
+  'notification_log',
+  {
+    id:          text('id').primaryKey(),
+    tenantId:    text('tenant_id').notNull(),
+    customerId:  text('customer_id').notNull(),
+    dedupeKey:   text('dedupe_key').notNull(),
+    eventType:   text('event_type'),
+    message:     text('message'),
+    smsTo:       text('sms_to'),
+    smsStatus:   text('sms_status'),
+    emailTo:     text('email_to'),
+    emailStatus: text('email_status'),
+    createdAt:   timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex('notification_log_tenant_dedupe_idx').on(t.tenantId, t.dedupeKey),
+    index('notification_log_customer_idx').on(t.tenantId, t.customerId),
+  ],
+);
+
+// Per-tenant notification preferences. Absent row = all defaults (channels on, all events on).
+export const notificationSettings = pgTable('notification_settings', {
+  tenantId:       text('tenant_id').primaryKey(),
+  smsEnabled:     boolean('sms_enabled').notNull().default(true),
+  emailEnabled:   boolean('email_enabled').notNull().default(true),
+  brandOverride:  text('brand_override'),
+  disabledEvents: json('disabled_events').notNull().$type<string[]>().default([]),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
 export const planGroups = pgTable(
   'plan_groups',
   {

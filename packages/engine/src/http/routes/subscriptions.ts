@@ -65,6 +65,7 @@ export function makeSubscriptionsRouter(
       cancel_at_period_end: s.cancelAtPeriodEnd,
       canceled_at:          s.canceledAt?.toISOString() ?? null,
       has_card:             s.defaultPaymentMethodId != null,
+      metadata:             s.metadata ?? {},
       created_at:           s.createdAt.toISOString(),
       scheduled_change:     serializeScheduledChange(await scheduledChangeRepo.findBySubscription(tenantId, s.id)),
     })));

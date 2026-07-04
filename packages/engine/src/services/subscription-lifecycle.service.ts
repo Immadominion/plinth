@@ -5,6 +5,7 @@ import type { SubscriptionRepo, Subscription } from '../db/subscription.repo.js'
 import type { EventRepo } from '../db/event.repo.js';
 import type { ScheduledChangeRepo } from '../db/scheduled-change.repo.js';
 import type { TenantPolicyRepo } from '../db/policy.repo.js';
+import type { NotificationService } from './notification.service.js';
 import { NotFoundError, InvalidRequestError } from '../domain/errors.js';
 
 const CANCELABLE = ['active', 'trialing', 'past_due', 'grace', 'delinquent', 'paused', 'incomplete'];
@@ -33,6 +34,7 @@ export class SubscriptionLifecycleService {
     private readonly eventRepo: EventRepo,
     private readonly uow: UnitOfWork,
     private readonly clock: Clock,
+    private readonly notify?: NotificationService,
   ) {}
 
   async cancel(params: { tenantId: string; subscriptionId: string }): Promise<CancelResult> {
@@ -75,6 +77,12 @@ export class SubscriptionLifecycleService {
         occurredAt: now, createdAt: now,
       }, tx);
     });
+
+    // Immediate cancel is terminal now → notify. An end_of_period cancel notifies later, when the
+    // billing tick actually cancels it at period end (see renewOne).
+    if (immediate) {
+      await this.notify?.canceled({ tenantId, customerId: sub.customerId, subscriptionId: sub.id });
+    }
 
     return {
       subscriptionId: sub.id,

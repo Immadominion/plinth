@@ -10,11 +10,43 @@ import { Eye, EyeOff, AlertTriangle, CheckCircle, Copy, Check, Plus, Trash2 } fr
 import { api } from '@/lib/api';
 
 const VERTICAL_TABS = [
-  { id: 'general',  label: 'General' },
-  { id: 'apikeys',  label: 'API Keys' },
-  { id: 'billing',  label: 'Billing Policy' },
-  { id: 'testmode', label: 'Test Mode' },
+  { id: 'general',       label: 'General' },
+  { id: 'apikeys',       label: 'API Keys' },
+  { id: 'billing',       label: 'Billing Policy' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'testmode',      label: 'Test Mode' },
 ];
+
+const NOTIFY_EVENTS = [
+  { key: 'payment_due', label: 'Payment due',        hint: 'Transfer-rail reminder with the account to pay into' },
+  { key: 'past_due',    label: 'Past due',           hint: 'Charge failed — asks the customer to update payment' },
+  { key: 'delinquent',  label: 'On hold (delinquent)', hint: 'Access suspended for non-payment' },
+  { key: 'recovered',   label: 'Recovered',          hint: 'Payment received after dunning — back to active' },
+  { key: 'activated',   label: 'Welcome',            hint: 'First activation of a subscription' },
+  { key: 'receipt',     label: 'Payment receipt',    hint: 'Successful renewal payment' },
+  { key: 'trial_ended', label: 'Trial ended',        hint: 'Free trial converted to a paid subscription' },
+  { key: 'canceled',    label: 'Canceled',           hint: 'Subscription canceled' },
+];
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+        on ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-slate-700',
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
+          on ? 'translate-x-[18px]' : 'translate-x-[3px]',
+        )}
+      />
+    </button>
+  );
+}
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
@@ -56,6 +88,63 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setKeysLoading(false));
   }, [activeTab]);
+
+  // Notification settings state
+  const [notifSms, setNotifSms] = useState(true);
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifBrand, setNotifBrand] = useState('');
+  const [notifDisabled, setNotifDisabled] = useState<string[]>([]);
+  const [notifSaved, setNotifSaved] = useState(false);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [testChannel, setTestChannel] = useState<'sms' | 'email'>('sms');
+  const [testTo, setTestTo] = useState('');
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'notifications') return;
+    api.notificationSettings.get()
+      .then((s: any) => {
+        setNotifSms(s.sms_enabled ?? true);
+        setNotifEmail(s.email_enabled ?? true);
+        setNotifBrand(s.brand_override ?? '');
+        setNotifDisabled(s.disabled_events ?? []);
+      })
+      .catch(() => {});
+  }, [activeTab]);
+
+  function toggleEvent(key: string) {
+    setNotifDisabled((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  async function saveNotifSettings() {
+    setNotifSaving(true);
+    try {
+      await api.notificationSettings.update({
+        sms_enabled:     notifSms,
+        email_enabled:   notifEmail,
+        brand_override:  notifBrand.trim() || null,
+        disabled_events: notifDisabled,
+      });
+      setNotifSaved(true);
+      setTimeout(() => setNotifSaved(false), 2000);
+    } catch {} finally {
+      setNotifSaving(false);
+    }
+  }
+
+  async function sendTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r: any = await api.notificationSettings.test(testChannel, testTo.trim());
+      setTestResult({ ok: !!r.ok, text: r.ok ? 'Sent — check the recipient.' : `Failed: ${r.error ?? 'provider error'}` });
+    } catch {
+      setTestResult({ ok: false, text: 'Failed — check the provider is configured (Twilio / SMTP).' });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function createKey() {
     setCreating(true);
@@ -343,6 +432,87 @@ export default function SettingsPage() {
                         {saved ? '✓ Saved' : 'Save policy'}
                       </Button>
                       {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Changes saved</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {activeTab === 'notifications' && (
+              <>
+                <Card>
+                  <CardHeader><CardTitle>Channels</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-slate-100">SMS (Twilio)</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">Text customers on billing events.</p>
+                      </div>
+                      <Toggle on={notifSms} onChange={setNotifSms} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-slate-100">Email</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">Send branded emails on billing events.</p>
+                      </div>
+                      <Toggle on={notifEmail} onChange={setNotifEmail} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Brand</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-slate-300">Sender / brand name</label>
+                    <Input value={notifBrand} onChange={(e) => setNotifBrand(e.target.value)} placeholder={tenant?.name ?? 'Your business name'} />
+                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                      Shown to customers in every SMS and email. Leave blank to use your business name
+                      {' '}(<span className="font-medium">{tenant?.name ?? '—'}</span>).
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Events</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    {NOTIFY_EVENTS.map((ev) => (
+                      <div key={ev.key} className="flex items-center justify-between">
+                        <div className="pr-4">
+                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{ev.label}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">{ev.hint}</p>
+                        </div>
+                        <Toggle on={!notifDisabled.includes(ev.key)} onChange={() => toggleEvent(ev.key)} />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <div className="flex items-center gap-3">
+                  <Button onClick={saveNotifSettings} disabled={notifSaving}>
+                    {notifSaved ? '✓ Saved' : notifSaving ? 'Saving…' : 'Save notifications'}
+                  </Button>
+                  {notifSaved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Changes saved</span>}
+                </div>
+
+                <Card>
+                  <CardHeader><CardTitle>Send a test</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-[120px_1fr] gap-3">
+                      <Select value={testChannel} onChange={(e) => setTestChannel(e.target.value as 'sms' | 'email')}>
+                        <option value="sms">SMS</option>
+                        <option value="email">Email</option>
+                      </Select>
+                      <Input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder={testChannel === 'sms' ? '+234…' : 'you@example.com'} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button variant="outline" onClick={sendTest} disabled={testing || !testTo.trim()}>
+                        {testing ? 'Sending…' : 'Send test'}
+                      </Button>
+                      {testResult && (
+                        <span className={cn('text-xs', testResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                          {testResult.text}
+                        </span>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

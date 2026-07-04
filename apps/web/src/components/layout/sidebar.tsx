@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, CreditCard, AlertTriangle,
   FileText, ArrowLeftRight, Package, Activity, Settings, Zap,
-  Webhook, LogOut, ChevronUp,
+  Webhook, Bell, LogOut, ChevronUp,
 } from 'lucide-react';
 import { api, logout } from '@/lib/api';
 
@@ -14,10 +14,11 @@ const NAV_ITEMS = [
   { href: '/dashboard',               icon: LayoutDashboard, label: 'Overview' },
   { href: '/dashboard/customers',     icon: Users,           label: 'Customers' },
   { href: '/dashboard/subscriptions', icon: CreditCard,      label: 'Subscriptions' },
-  { href: '/dashboard/dunning',       icon: AlertTriangle,   label: 'Dunning', badge: '5' },
+  { href: '/dashboard/dunning',       icon: AlertTriangle,   label: 'Dunning' },
   { href: '/dashboard/invoices',      icon: FileText,        label: 'Invoices' },
   { href: '/dashboard/transfers',     icon: ArrowLeftRight,  label: 'Transfers' },
   { href: '/dashboard/catalog',       icon: Package,         label: 'Catalog' },
+  { href: '/dashboard/notifications', icon: Bell,            label: 'Notifications' },
   { href: '/dashboard/events',        icon: Activity,        label: 'Events' },
   { href: '/dashboard/webhooks',      icon: Webhook,         label: 'Webhooks' },
   { href: '/dashboard/settings',      icon: Settings,        label: 'Settings' },
@@ -65,7 +66,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, icon: Icon, label, badge }) => {
+        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
           return (
             <Link
@@ -80,11 +81,6 @@ export function Sidebar() {
             >
               <Icon size={16} />
               <span className="flex-1">{label}</span>
-              {badge && (
-                <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
-                  {badge}
-                </span>
-              )}
             </Link>
           );
         })}

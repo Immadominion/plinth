@@ -9,6 +9,10 @@ import { DrizzleTenantRepo } from '../db/tenant.repo.js';
 import type { TenantRepo } from '../db/tenant.repo.js';
 import { DrizzleCustomerRepo } from '../db/customer.repo.js';
 import type { CustomerRepo } from '../db/customer.repo.js';
+import { DrizzleNotificationLogRepo } from '../db/notification-log.repo.js';
+import type { NotificationLogRepo } from '../db/notification-log.repo.js';
+import { DrizzleNotificationSettingsRepo } from '../db/notification-settings.repo.js';
+import type { NotificationSettingsRepo } from '../db/notification-settings.repo.js';
 import { DrizzleLedgerRepo } from '../db/ledger.repo.js';
 import type { LedgerRepo } from '../db/ledger.repo.js';
 import { DrizzlePlanGroupRepo, DrizzlePlanRepo } from '../db/catalog.repo.js';
@@ -44,7 +48,7 @@ import { PolicyService } from '../services/policy.service.js';
 import { SandboxService } from '../services/sandbox.service.js';
 import { ApplicationService } from '../services/application.service.js';
 import { AuthService } from '../services/auth.service.js';
-import { NodemailerEmailService, NoopEmailService } from '../services/email.service.js';
+import { NodemailerEmailService, NoopEmailService, type EmailService } from '../services/email.service.js';
 import { DrizzleClaimTokenRepo } from '../db/claim-token.repo.js';
 import { DrizzleApplicationRepo } from '../db/application.repo.js';
 import { DrizzleCardTokenRepo } from '../db/card-token.repo.js';
@@ -85,6 +89,9 @@ export interface Container {
   planGroupRepo: PlanGroupRepo;
   planRepo: PlanRepo;
   invoiceRepo: InvoiceRepo;
+  notificationLogRepo: NotificationLogRepo;
+  notificationSettingsRepo: NotificationSettingsRepo;
+  notificationService: NotificationService;
   suspenseRepo: SuspenseRepo;
   jobQueue: JobQueue;
   entitlementsService: EntitlementsService;
@@ -151,7 +158,16 @@ export function buildContainer(): Container {
     env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER
       ? new TwilioSmsAdapter(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_FROM_NUMBER)
       : new NoopSmsAdapter();
-  const notificationService = new NotificationService(customerRepo, virtualAccountRepo, smsAdapter);
+  // Email notifications: Nodemailer when SMTP is configured, otherwise a Noop that just logs.
+  const emailService: EmailService = env.SMTP_USER && env.SMTP_PASS
+    ? new NodemailerEmailService(env.SMTP_USER, env.SMTP_PASS, env.SMTP_FROM_NAME)
+    : new NoopEmailService();
+  const notificationLogRepo = new DrizzleNotificationLogRepo();
+  const notificationSettingsRepo = new DrizzleNotificationSettingsRepo();
+  const notificationService = new NotificationService(
+    customerRepo, virtualAccountRepo, tenantRepo, smsAdapter, emailService,
+    notificationLogRepo, notificationSettingsRepo, clock,
+  );
 
   const tickService = new TickService(
     subscriptionRepo, invoiceRepo, eventRepo, planRepo,
@@ -165,7 +181,7 @@ export function buildContainer(): Container {
     scheduledChangeRepo, policyRepo, chargeCardService, postLedgerEntryService, uow, clock,
   );
   const subscriptionLifecycleService = new SubscriptionLifecycleService(
-    subscriptionRepo, policyRepo, scheduledChangeRepo, eventRepo, uow, clock,
+    subscriptionRepo, policyRepo, scheduledChangeRepo, eventRepo, uow, clock, notificationService,
   );
   const provisionVaService = new ProvisionVirtualAccountService(nomba, virtualAccountRepo, customerRepo, clock, env.NOMBA_SUB_ACCOUNT_ID);
   const transferPaymentService = new TransferPaymentService(subscriptionRepo, planRepo, invoiceRepo, provisionVaService);
@@ -178,10 +194,6 @@ export function buildContainer(): Container {
   const sandboxService = new SandboxService(
     tenantRepo, customerRepo, planGroupRepo, planRepo, eventRepo, uow, clock,
   );
-
-  const emailService = env.SMTP_USER && env.SMTP_PASS
-    ? new NodemailerEmailService(env.SMTP_USER, env.SMTP_PASS, env.SMTP_FROM_NAME)
-    : new NoopEmailService();
 
   const claimTokenRepo = new DrizzleClaimTokenRepo();
   const authService = new AuthService(claimTokenRepo, new DrizzleApplicationRepo(), tenantRepo, emailService, clock, env.APP_BASE_URL);
@@ -206,6 +218,9 @@ export function buildContainer(): Container {
     createTenantService,
     tenantRepo,
     customerRepo,
+    notificationLogRepo,
+    notificationSettingsRepo,
+    notificationService,
     ledgerRepo,
     postLedgerEntryService,
     createCustomerService,

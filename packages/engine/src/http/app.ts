@@ -13,6 +13,8 @@ import { makeSubscriptionsRouter } from './routes/subscriptions.js';
 import { makeInvoicesRouter } from './routes/invoices.js';
 import { makePolicyRouter } from './routes/policy.js';
 import { makeMeRouter } from './routes/me.js';
+import { makeNotificationsRouter } from './routes/notifications.js';
+import { makeNotificationSettingsRouter } from './routes/notification-settings.js';
 import { makeClockRouter, makeTickRouter, makeSuspenseRouter } from './routes/admin.js';
 import { makeWebhookRouter } from './routes/webhook.js';
 import { makeSandboxRouter } from './routes/sandbox.js';
@@ -76,6 +78,8 @@ export function buildApp(container: Container): Hono {
   v1.route('/policy',       makePolicyRouter(container.policyService));
   v1.route('/webhook-endpoints', makeWebhookEndpointsRouter(container.webhookEndpointService, container.webhookDeliveryRepo));
   v1.route('/me',           makeMeRouter(container.tenantRepo));
+  v1.route('/notifications', makeNotificationsRouter(container.notificationLogRepo, container.notificationService));
+  v1.route('/notification-settings', makeNotificationSettingsRouter(container.notificationSettingsRepo, container.notificationService, container.clock));
   v1.route('/keys',         makeApiKeysRouter(container.tenantRepo, container.clock));
 
   app.route('/v1', v1);

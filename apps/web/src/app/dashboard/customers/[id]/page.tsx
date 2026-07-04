@@ -39,9 +39,25 @@ interface Subscription {
   next_bill_at: string | null;
 }
 
+interface NotifItem {
+  id: string;
+  event_type: string | null;
+  message: string | null;
+  sms_status: string | null;
+  email_status: string | null;
+  created_at: string;
+}
+
+const NOTIF_LABEL: Record<string, string> = {
+  payment_due: 'Payment due', past_due: 'Past due', delinquent: 'Delinquent', recovered: 'Recovered',
+  activated: 'Welcome', receipt: 'Payment receipt', trial_ended: 'Trial ended', canceled: 'Canceled',
+  reminder: 'Reminder (manual)',
+};
+
 const TABS = [
   { id: 'subscriptions', label: 'Subscriptions' },
   { id: 'entitlements', label: 'Entitlements' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'ledger', label: 'Ledger' },
   { id: 'events', label: 'Events' },
 ];
@@ -61,6 +77,9 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
+  const [notifsLoaded, setNotifsLoaded] = useState(false);
+  const [reminding, setReminding] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -95,6 +114,23 @@ export default function CustomerDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (tab !== 'notifications' || !id || notifsLoaded) return;
+    (api.notifications.list(id) as Promise<{ data: NotifItem[] }>)
+      .then((r) => { setNotifs(r.data ?? []); setNotifsLoaded(true); })
+      .catch(() => {});
+  }, [tab, id, notifsLoaded]);
+
+  async function sendReminder() {
+    if (!id) return;
+    setReminding('sending');
+    try {
+      const r = await api.notifications.remind(id) as { ok?: boolean };
+      setReminding(r.ok ? 'sent' : 'failed');
+      setNotifsLoaded(false); // refresh history next time the tab opens
+    } catch { setReminding('failed'); }
+  }
 
   function copyId() {
     if (!customer) return;
@@ -187,12 +223,38 @@ export default function CustomerDetailPage() {
                   <p className="text-sm text-gray-700 dark:text-slate-300">{customer.phone || '—'}</p>
                 </div>
                 <div>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">Reachable via</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${customer.phone ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-400 dark:bg-slate-800 dark:text-slate-500'}`}>
+                      SMS {customer.phone ? '✓' : '—'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${customer.email ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-400 dark:bg-slate-800 dark:text-slate-500'}`}>
+                      Email {customer.email ? '✓' : '—'}
+                    </span>
+                  </div>
+                </div>
+                <div>
                   <p className="text-xs text-gray-500 dark:text-slate-400">External Ref</p>
                   <p className="text-sm font-mono text-gray-700 dark:text-slate-300">{customer.external_ref || '—'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-slate-400">Created</p>
                   <p className="text-sm text-gray-700 dark:text-slate-300">{formatDate(customer.created_at)}</p>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs"
+                    onClick={sendReminder}
+                    disabled={reminding === 'sending' || (!customer.phone && !customer.email)}
+                    title="Send this customer a payment reminder by SMS + email"
+                  >
+                    {reminding === 'sending' ? 'Sending…'
+                      : reminding === 'sent' ? '✓ Reminder sent'
+                      : reminding === 'failed' ? 'Failed — retry'
+                      : 'Send payment reminder'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -359,6 +421,36 @@ export default function CustomerDetailPage() {
                             </ul>
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tab === 'notifications' && (
+                  <div>
+                    {notifs.length === 0 ? (
+                      <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">No notifications sent to this customer yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {notifs.map((n) => (
+                          <div key={n.id} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                                  {NOTIF_LABEL[n.event_type ?? ''] ?? n.event_type ?? 'Notification'}
+                                </span>
+                                {n.sms_status && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${n.sms_status === 'sent' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>SMS</span>
+                                )}
+                                {n.email_status && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${n.email_status === 'sent' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>Email</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-slate-400 line-clamp-2">{n.message ?? '—'}</p>
+                            </div>
+                            <span className="text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap shrink-0">{formatDate(n.created_at)}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

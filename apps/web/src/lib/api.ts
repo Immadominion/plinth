@@ -82,6 +82,18 @@ export const api = {
   invoices: {
     list:   ()            => request('/v1/invoices'),
   },
+  notifications: {
+    list: (customerId?: string) =>
+      request(`/v1/notifications${customerId ? `?customer_id=${encodeURIComponent(customerId)}` : ''}`),
+    remind: (customerId: string) =>
+      request('/v1/notifications/remind', { method: 'POST', body: JSON.stringify({ customer_id: customerId }) }),
+  },
+  notificationSettings: {
+    get:    ()                => request('/v1/notification-settings'),
+    update: (data: unknown)   => request('/v1/notification-settings', { method: 'PUT', body: JSON.stringify(data) }),
+    test:   (channel: 'sms' | 'email', to: string) =>
+      request('/v1/notification-settings/test', { method: 'POST', body: JSON.stringify({ channel, to }) }),
+  },
   policy: {
     get:         ()                     => request('/v1/policy'),
     update:      (data: unknown)        => request('/v1/policy', { method: 'PUT', body: JSON.stringify(data) }),
