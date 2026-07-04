@@ -1,3 +1,5 @@
+import { mockApi, USE_MOCKS } from './fixtures';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:7331';
 
 export interface VirtualAccount {
@@ -52,7 +54,7 @@ export function logout(): void {
   localStorage.removeItem('nomba_tenant_id');
 }
 
-export const api = {
+const realApi = {
   me: {
     get: () => request<{ id: string; name: string; created_at: string }>('/v1/me'),
   },
@@ -167,3 +169,6 @@ export const api = {
     reject:  (id: string, reason: string)               => adminRequest(`/admin/applications/${id}/reject`,  { method: 'POST', body: JSON.stringify({ reason }) }),
   },
 };
+
+// When NEXT_PUBLIC_USE_MOCKS=true, serve fixtures so the whole dashboard renders with no backend.
+export const api = (USE_MOCKS ? (mockApi as unknown as typeof realApi) : realApi);

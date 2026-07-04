@@ -1,14 +1,17 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Zap, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { USE_MOCKS } from '@/lib/fixtures';
 
 type Step = 'form' | 'sent';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<Step>('form');
   const [loading, setLoading] = useState(false);
@@ -16,6 +19,14 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Mock/design mode: there's no backend to authenticate against — just drop fake credentials
+    // and move straight into the dashboard. Pure demo navigation.
+    if (USE_MOCKS) {
+      localStorage.setItem('nomba_api_key', 'mock');
+      localStorage.setItem('nomba_tenant_id', 'ten_mock_nollybox');
+      router.push('/dashboard');
+      return;
+    }
     if (!email.trim()) return;
     setError('');
     setLoading(true);
@@ -58,9 +69,12 @@ export default function LoginPage() {
                 />
                 {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
               </div>
-              <Button type="submit" className="w-full" disabled={loading || !email.trim()}>
-                {loading ? 'Sending…' : 'Send login link →'}
+              <Button type="submit" className="w-full" disabled={loading || (!USE_MOCKS && !email.trim())}>
+                {loading ? 'Sending…' : USE_MOCKS ? 'Enter dashboard →' : 'Send login link →'}
               </Button>
+              {USE_MOCKS && (
+                <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Demo mode — no login required, click to continue.</p>
+              )}
             </form>
           ) : (
             <div className="text-center space-y-3">

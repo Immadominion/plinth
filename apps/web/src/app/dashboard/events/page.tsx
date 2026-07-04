@@ -19,13 +19,18 @@ function getEventFamilyColor(type: string): string {
 }
 
 const MOCK_PAYLOAD: Record<string, object> = {
-  evt_01: { type: 'subscription.renewed', data: { subscriptionId: 'sub_01', planId: 'plan_pro', amount: 500000 } },
-  evt_02: { type: 'invoice.paid', data: { invoiceId: 'inv_01', amount: 500000, paidAt: '2026-06-01T08:00:01Z' } },
-  evt_03: { type: 'subscription.past_due', data: { subscriptionId: 'sub_02', attempts: 1 } },
-  evt_04: { type: 'subscription.grace', data: { subscriptionId: 'sub_03', gracePeriodDays: 7 } },
-  evt_05: { type: 'invoice.partially_paid', data: { invoiceId: 'inv_03', amountPaid: 100000, amountDue: 200000 } },
-  evt_06: { type: 'subscription.recovered', data: { subscriptionId: 'sub_10', attempt: 2, amount: 500000 } },
-  evt_07: { type: 'subscription.plan_change_scheduled', data: { subscriptionId: 'sub_04', newPlanId: 'plan_max' } },
+  evt_01: { type: 'subscription.activated', data: { subscriptionId: 'sub_ada', planId: 'plan_standard', invoiceId: 'inv_01' } },
+  evt_02: { type: 'invoice.paid', data: { invoiceId: 'inv_01', amount: 290000, paidAt: '2026-06-15T08:00:01Z' } },
+  evt_03: { type: 'invoice.payment_due', data: { invoiceId: 'inv_03', amount: 290000, rail: 'transfer' } },
+  evt_04: { type: 'subscription.past_due', data: { subscriptionId: 'sub_bola', declineCode: 'INSUFFICIENT_FUNDS', attempts: 1 } },
+  evt_05: { type: 'subscription.grace', data: { subscriptionId: 'sub_emeka', gracePeriodDays: 7 } },
+  evt_06: { type: 'subscription.delinquent', data: { subscriptionId: 'sub_ngozi' } },
+  evt_07: { type: 'subscription.recovered', data: { subscriptionId: 'sub_chidi', attempt: 2, amount: 1200000 } },
+  evt_08: { type: 'subscription.trial_ended', data: { subscriptionId: 'sub_tunde', strategy: 'activate_then_charge' } },
+  evt_09: { type: 'invoice.partially_paid', data: { invoiceId: 'inv_04', amountPaid: 100000, amountDue: 1200000 } },
+  evt_10: { type: 'subscription.plan_change_scheduled', data: { subscriptionId: 'sub_sch', newPlanId: 'plan_standard' } },
+  evt_11: { type: 'subscription.canceled', data: { subscriptionId: 'sub_zainab', reason: 'cancel_at_period_end' } },
+  evt_12: { type: 'subscription.renewed', data: { subscriptionId: 'sub_ada', planId: 'plan_standard', amount: 290000 } },
 };
 
 export default function EventsPage() {

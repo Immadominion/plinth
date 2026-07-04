@@ -90,20 +90,28 @@ export const MOCK_PLANS = [
   { id: 'plan_max', name: 'Max', group: 'Core', amount: 1200000, interval: 'month', active: true, features: ['Unlimited users', '500GB storage', 'Dedicated support', 'API access', 'Custom integrations'] },
 ];
 
+// Rich, varied set: multiple event families + several UNDELIVERED (which render a "Resend" button).
 export const MOCK_EVENTS = [
-  { id: 'evt_01', type: 'subscription.renewed', resourceId: 'sub_01', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-01T08:00:00Z' },
-  { id: 'evt_02', type: 'invoice.paid', resourceId: 'inv_01', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-01T08:00:01Z' },
-  { id: 'evt_03', type: 'subscription.past_due', resourceId: 'sub_02', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-01T09:15:00Z' },
-  { id: 'evt_04', type: 'subscription.grace', resourceId: 'sub_03', tenantId: 'ten_01', delivered: false, occurredAt: '2026-06-10T00:00:00Z' },
-  { id: 'evt_05', type: 'invoice.partially_paid', resourceId: 'inv_03', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-05T14:30:00Z' },
-  { id: 'evt_06', type: 'subscription.recovered', resourceId: 'sub_10', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-14T11:00:00Z' },
-  { id: 'evt_07', type: 'subscription.plan_change_scheduled', resourceId: 'sub_04', tenantId: 'ten_01', delivered: true, occurredAt: '2026-06-14T16:45:00Z' },
+  { id: 'evt_01', type: 'subscription.activated',             resourceId: 'sub_ada',    tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-15T08:00:00Z' },
+  { id: 'evt_02', type: 'invoice.paid',                       resourceId: 'inv_01',     tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-15T08:00:01Z' },
+  { id: 'evt_03', type: 'invoice.payment_due',                resourceId: 'inv_03',     tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-15T09:00:00Z' },
+  { id: 'evt_04', type: 'subscription.past_due',              resourceId: 'sub_bola',   tenantId: 'ten_01', delivered: false, occurredAt: '2026-06-16T09:15:00Z' },
+  { id: 'evt_05', type: 'subscription.grace',                 resourceId: 'sub_emeka',  tenantId: 'ten_01', delivered: false, occurredAt: '2026-06-17T00:00:00Z' },
+  { id: 'evt_06', type: 'subscription.delinquent',            resourceId: 'sub_ngozi',  tenantId: 'ten_01', delivered: false, occurredAt: '2026-06-18T00:00:00Z' },
+  { id: 'evt_07', type: 'subscription.recovered',            resourceId: 'sub_chidi',  tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-18T11:00:00Z' },
+  { id: 'evt_08', type: 'subscription.trial_ended',          resourceId: 'sub_tunde',  tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-19T00:00:00Z' },
+  { id: 'evt_09', type: 'invoice.partially_paid',            resourceId: 'inv_04',     tenantId: 'ten_01', delivered: false, occurredAt: '2026-06-19T14:30:00Z' },
+  { id: 'evt_10', type: 'subscription.plan_change_scheduled', resourceId: 'sub_sch',    tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-20T16:45:00Z' },
+  { id: 'evt_11', type: 'subscription.canceled',            resourceId: 'sub_zainab', tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-20T18:00:00Z' },
+  { id: 'evt_12', type: 'subscription.renewed',             resourceId: 'sub_ada',    tenantId: 'ten_01', delivered: true,  occurredAt: '2026-06-21T08:00:00Z' },
 ];
 
 export const MOCK_ADMIN_TENANTS = [
-  { id: 'ten_01', name: 'Acme SaaS Co', mode: 'live', mrr: 24500000, customers: 47, suspense: 1, queueLag: 0 },
-  { id: 'ten_02', name: 'PayFlow Nigeria', mode: 'live', mrr: 68000000, customers: 134, suspense: 3, queueLag: 2 },
-  { id: 'ten_03', name: 'Dev Sandbox', mode: 'test', mrr: 0, customers: 12, suspense: 0, queueLag: 0 },
+  { id: 'ten_01', name: 'Nollybox',        mode: 'live', mrr: 24500000, customers: 47,  suspense: 1, queueLag: 0 },
+  { id: 'ten_02', name: 'PayFlow Nigeria', mode: 'live', mrr: 68000000, customers: 134, suspense: 5, queueLag: 12 }, // high suspense + queue lag
+  { id: 'ten_03', name: 'FitClub NG',      mode: 'live', mrr: 9800000,  customers: 63,  suspense: 0, queueLag: 0 },
+  { id: 'ten_04', name: 'EduPrime',        mode: 'live', mrr: 15200000, customers: 88,  suspense: 2, queueLag: 1 },
+  { id: 'ten_05', name: 'Dev Sandbox',     mode: 'test', mrr: 0,        customers: 12,  suspense: 0, queueLag: 0 },
 ];
 
 export const MOCK_APPLICATIONS = [

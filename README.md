@@ -79,6 +79,22 @@ cd apps/web && pnpm dev -- -p 3002
 cd docs && mintlify dev
 ```
 
+### Dashboard mock mode (no backend needed)
+
+For **design / UI work**, the dashboard can run against built-in fixtures instead of the engine —
+no Postgres, no seeding, every page fully populated with realistic data in **every state**
+(subscriptions across all lifecycle states, a full dunning board, notifications with sent/failed
+rows, webhook deliveries in every status, etc.).
+
+```bash
+cd apps/web
+cp .env.local.example .env.local     # sets NEXT_PUBLIC_USE_MOCKS=true
+pnpm dev -- -p 3002
+```
+
+The fixtures live in [`apps/web/src/lib/fixtures.ts`](apps/web/src/lib/fixtures.ts) — add a row there
+to surface a new state on any screen. Set `NEXT_PUBLIC_USE_MOCKS` back to unset/false to hit the real API.
+
 ### Environment
 
 Key variables in `.env` (at the repo root):
