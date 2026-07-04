@@ -33,6 +33,8 @@ import { CreateSubscriptionService } from '../services/subscription.service.js';
 import { FinalizeInvoiceService } from '../services/invoice.service.js';
 import { RelayOutboxService } from '../services/outbox.service.js';
 import { ChargeCardService, TickService } from '../services/billing.service.js';
+import { NotificationService } from '../services/notification.service.js';
+import { TwilioSmsAdapter, NoopSmsAdapter, type SmsAdapter } from '../adapters/sms.js';
 import { PlanChangeService } from '../services/plan-change.service.js';
 import { SubscriptionLifecycleService } from '../services/subscription-lifecycle.service.js';
 import { ProvisionVirtualAccountService } from '../services/virtual-account.service.js';
@@ -143,10 +145,18 @@ export function buildContainer(): Container {
   const webhookSecret = env.NOMBA_WEBHOOK_SECRET ?? 'dev-webhook-secret';
   const relayOutboxService = new RelayOutboxService(eventRepo, jobQueue, webhookSecret);
   const chargeCardService = new ChargeCardService(nomba);
+
+  // SMS notifications: Twilio (real SMS) when configured, otherwise a Noop that just logs.
+  const smsAdapter: SmsAdapter =
+    env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER
+      ? new TwilioSmsAdapter(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_FROM_NUMBER)
+      : new NoopSmsAdapter();
+  const notificationService = new NotificationService(customerRepo, virtualAccountRepo, smsAdapter);
+
   const tickService = new TickService(
     subscriptionRepo, invoiceRepo, eventRepo, planRepo,
     chargeCardService, postLedgerEntryService, scheduledChangeRepo,
-    dunningRepo, policyRepo, uow, clock,
+    dunningRepo, policyRepo, uow, clock, notificationService,
   );
   const entitlementsService = new EntitlementsService(subscriptionRepo, planRepo);
   const policyService = new PolicyService(policyRepo, clock);

@@ -1,5 +1,6 @@
 import { ulid } from 'ulid';
 import type { Clock } from '../adapters/clock.js';
+import type { NotificationService } from './notification.service.js';
 import type { UnitOfWork } from '../db/unit-of-work.js';
 import type { SubscriptionRepo, Subscription } from '../db/subscription.repo.js';
 import type { InvoiceRepo, Invoice } from '../db/invoice.repo.js';
@@ -84,6 +85,8 @@ export class TickService {
     private readonly policyRepo: TenantPolicyRepo,
     private readonly uow: UnitOfWork,
     private readonly clock: Clock,
+    // Optional so tests can omit it; when present, customer SMS notifications fire on lifecycle events.
+    private readonly notify?: NotificationService,
   ) {}
 
   async tick(tenantId: string): Promise<TickResult> {
@@ -363,6 +366,7 @@ export class TickService {
         occurredAt: now, createdAt: now,
       }, tx);
     });
+    await this.notify?.recovered(tenantId, sub.customerId);
     return true;
   }
 
@@ -514,6 +518,8 @@ export class TickService {
           occurredAt: now, createdAt: now,
         }, tx);
       });
+      // Flagship SMS: tell the transfer customer their account + amount so they can pay ahead.
+      await this.notify?.paymentDue(sub.tenantId, sub.customerId, amountDue);
       return true;
     }
 
@@ -650,6 +656,7 @@ export class TickService {
         createdAt:    now,
       }, tx);
     });
+    await this.notify?.pastDue(sub.tenantId, sub.customerId);
   }
 
   private async advanceToGrace(sub: Subscription, now: Date): Promise<void> {
@@ -875,6 +882,7 @@ export class TickService {
               createdAt:    now,
             }, tx);
           });
+          await this.notify?.delinquent(sub.tenantId, sub.customerId);
           expired++;
         } catch { /* continue */ }
       }

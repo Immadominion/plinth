@@ -36,6 +36,11 @@ const EnvSchema = z.object({
 
   // How often the outbound-webhook dispatcher runs (fan-out + deliver due retries).
   WEBHOOK_DISPATCH_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
+
+  // Twilio SMS (customer notifications). Without creds, notifications log via the Noop adapter.
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
