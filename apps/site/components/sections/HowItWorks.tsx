@@ -21,7 +21,7 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <Section id="how-it-works" className="bg-bone">
+    <Section id="how-it-works" full className="bg-bone">
       <Container>
         <Reveal>
           <SectionHeading

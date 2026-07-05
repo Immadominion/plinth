@@ -4,7 +4,7 @@ import { ArrowRight } from "./icons";
 
 export default function FinalCTA() {
   return (
-    <Section id="start" className="bg-bone">
+    <Section id="start" full className="bg-bone">
       <Container>
         <div className="relative overflow-hidden rounded-3xl bg-ink-900 px-6 py-16 text-center md:px-12 md:py-28">
           {/* the plinth itself — big on the background. The mark IS a column on a

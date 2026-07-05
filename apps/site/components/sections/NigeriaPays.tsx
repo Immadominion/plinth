@@ -11,7 +11,7 @@ const stats = [
 
 export default function NigeriaPays() {
   return (
-    <Section id="nigeria" className="bg-white">
+    <Section id="nigeria" full className="bg-white">
       <Container>
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           <Reveal>

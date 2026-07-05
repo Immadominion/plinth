@@ -20,13 +20,24 @@ export function Section({
   id,
   className = "",
   children,
+  full = false,
 }: {
   id?: string;
   className?: string;
   children: ReactNode;
+  /** fill the viewport (min 100svh) with content vertically centred — desktop
+      up; on mobile it falls back to natural height so phones don't over-scroll */
+  full?: boolean;
 }) {
   return (
-    <section id={id} className={`scroll-mt-24 py-20 md:py-28 ${className}`}>
+    <section
+      id={id}
+      className={`scroll-mt-24 ${
+        full
+          ? "flex flex-col justify-center py-16 md:min-h-[100svh] md:py-20"
+          : "py-20 md:py-28"
+      } ${className}`}
+    >
       {children}
     </section>
   );

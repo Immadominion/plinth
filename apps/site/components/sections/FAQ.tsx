@@ -31,7 +31,7 @@ const faqs = [
 
 export default function FAQ() {
   return (
-    <Section id="faq" className="bg-white">
+    <Section id="faq" full className="bg-white">
       <Container>
         <Reveal>
           <SectionHeading center eyebrow="FAQ" title="Questions, answered." />

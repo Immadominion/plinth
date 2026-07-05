@@ -39,7 +39,7 @@ const tiers = [
 
 export default function Pricing() {
   return (
-    <Section id="pricing" className="bg-white">
+    <Section id="pricing" full className="bg-white">
       <Container>
         <Reveal>
           <SectionHeading
