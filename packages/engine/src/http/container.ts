@@ -189,6 +189,7 @@ export function buildContainer(): Container {
     virtualAccountRepo, inboundTransferRepo, suspenseRepo, invoiceRepo,
     eventRepo, postLedgerEntryService, uow, clock,
     (t, cust) => tickService.activateFromPayment(t, cust),
+    (t, cust) => tickService.recoverFromPaymentByCustomer(t, cust),
   );
 
   const sandboxService = new SandboxService(
