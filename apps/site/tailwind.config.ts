@@ -10,7 +10,9 @@ const config: Config = {
         // near-white page (not yellowy); "200" is a cool gray for subtle section banding
         bone: { DEFAULT: "#FAFAFA", 200: "#F5F5F5" },
         // the single accent — used sparingly (primary CTAs, the occasional dot)
-        jade: { DEFAULT: "#0FA37F", 600: "#0C8A6B", 400: "#3BC0A1", 100: "#DCF1EA" },
+        // DEFAULT is the vibrant brand accent (dots, tints, large headings — 3:1 large-text).
+        // 600/700 are the AA-safe deeper jades for white-text buttons/pills + small jade text.
+        jade: { DEFAULT: "#0FA37F", 600: "#0B8366", 700: "#0A7458", 400: "#3BC0A1", 100: "#DCF1EA" },
         // secondary text
         mid: "#737373",
       },

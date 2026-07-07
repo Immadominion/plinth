@@ -78,7 +78,7 @@ export default function Pricing() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-display text-lg font-semibold text-ink">{t.name}</h3>
                     {t.highlight ? (
-                      <span className="rounded-full bg-jade px-2.5 py-1 text-[11px] font-semibold text-white">
+                      <span className="rounded-full bg-jade-600 px-2.5 py-1 text-[11px] font-semibold text-white">
                         Most popular
                       </span>
                     ) : null}

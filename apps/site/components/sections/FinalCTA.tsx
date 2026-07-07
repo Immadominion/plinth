@@ -55,7 +55,7 @@ export default function FinalCTA() {
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
               <a
                 href="#"
-                className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-jade px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-600 sm:w-auto"
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-jade-600 px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-700 sm:w-auto"
               >
                 Start building
                 <ArrowRight className="arrow-slide h-4 w-4" />

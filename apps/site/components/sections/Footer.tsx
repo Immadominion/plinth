@@ -47,7 +47,7 @@ export default function Footer() {
 
           {columns.map((col) => (
             <div key={col.title} className="lg:col-span-2">
-              <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/40">{col.title}</h3>
+              <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/60">{col.title}</h3>
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l}>
@@ -61,7 +61,7 @@ export default function Footer() {
 
         {/* ── offices ── */}
         <Reveal delay={80} className="mt-14 border-t border-ink/10 pt-8">
-          <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/40">Offices</h3>
+          <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/60">Offices</h3>
           <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
             {offices.map((o, i) => (
               <div key={`${o.country}-${i}`} className="text-sm leading-relaxed text-ink/60">
@@ -77,7 +77,7 @@ export default function Footer() {
           </div>
         </Reveal>
 
-        <p className="mt-10 text-xs text-ink/45">
+        <p className="mt-10 text-xs text-ink/60">
           Naira (NGN). Amounts shown human-readable; the API uses kobo.
         </p>
       </Container>

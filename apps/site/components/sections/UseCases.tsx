@@ -56,14 +56,14 @@ function AssetSlot({
         <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-jade-600">
           {tag}
         </span>
-        <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink/45 ring-1 ring-ink/10">
+        <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink/60 ring-1 ring-ink/10">
           {type}
         </span>
       </div>
       <div className="flex flex-1 items-center justify-center py-3">
         <Icon className="h-8 w-8 text-ink/25" />
       </div>
-      <p className="text-[11.5px] leading-snug text-ink/50">{note}</p>
+      <p className="text-[11.5px] leading-snug text-ink/60">{note}</p>
     </div>
   );
 }
@@ -75,8 +75,8 @@ export default function UseCases() {
         <div className="grid auto-rows-[168px] grid-cols-2 gap-3 md:auto-rows-[176px] md:grid-cols-4 md:gap-4">
           {/* A — title (jade anchor) */}
           <Reveal className="col-span-2 row-span-2 md:col-start-1 md:row-start-1">
-            <div className="flex h-full flex-col justify-between rounded-2xl bg-jade p-6 text-white">
-              <span className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-white/70">
+            <div className="flex h-full flex-col justify-between rounded-2xl bg-jade-600 p-6 text-white">
+              <span className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-white/90">
                 Who builds on Plinth
               </span>
               <div>
@@ -85,7 +85,7 @@ export default function UseCases() {
                   <br />
                   many businesses.
                 </h2>
-                <p className="mt-3 max-w-[26ch] text-sm leading-relaxed text-white/85">
+                <p className="mt-3 max-w-[26ch] text-sm leading-relaxed text-white/95">
                   If you collect on a schedule, Plinth carries the hard part.
                 </p>
               </div>
@@ -156,7 +156,7 @@ export default function UseCases() {
               className="group flex h-full flex-col justify-between rounded-2xl border border-ink/12 bg-white p-5 transition-colors hover:border-jade/40"
             >
               <SparkIcon className="h-6 w-6 text-jade-600" />
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-jade">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-jade-600">
                 Build something else
                 <ArrowRight className="arrow-slide h-4 w-4" />
               </span>

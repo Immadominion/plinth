@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Eye, EyeOff, AlertTriangle, CheckCircle, Copy, Check, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 const VERTICAL_TABS = [
@@ -129,7 +130,12 @@ export default function SettingsPage() {
       });
       setNotifSaved(true);
       setTimeout(() => setNotifSaved(false), 2000);
-    } catch {} finally {
+      toast.success('Notification settings saved');
+    } catch (e) {
+      toast.error("Couldn't save notification settings", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
       setNotifSaving(false);
     }
   }
@@ -153,13 +159,21 @@ export default function SettingsPage() {
       const res = await api.keys.create('live');
       setNewKey(res.api_key);
       setKeys((prev) => [{ id: res.id, prefix: res.prefix, mode: 'live', created_at: new Date().toISOString(), revoked_at: null }, ...prev]);
-    } catch {} finally { setCreating(false); }
+      toast.success('New live API key created — copy it now, it won’t be shown again');
+    } catch (e) {
+      toast.error("Couldn't create API key", { description: e instanceof Error ? e.message : undefined });
+    } finally { setCreating(false); }
   }
 
   async function revokeKey(id: string) {
     if (!confirm('Revoke this key? Any requests using it will stop working immediately.')) return;
-    await api.keys.revoke(id);
-    setKeys((prev) => prev.map((k) => k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k));
+    try {
+      await api.keys.revoke(id);
+      setKeys((prev) => prev.map((k) => k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k));
+      toast.success('API key revoked');
+    } catch (e) {
+      toast.error("Couldn't revoke key", { description: e instanceof Error ? e.message : undefined });
+    }
   }
 
   // Rotate = create a fresh key (same mode) and revoke the old one. The new full key is
@@ -176,7 +190,10 @@ export default function SettingsPage() {
         { id: res.id, prefix: res.prefix, mode: k.mode, created_at: now, revoked_at: null },
         ...prev.map((x) => (x.id === k.id ? { ...x, revoked_at: now } : x)),
       ]);
-    } catch {} finally {
+      toast.success('Key rotated — copy the new key now, it won’t be shown again');
+    } catch (e) {
+      toast.error("Couldn't rotate key", { description: e instanceof Error ? e.message : undefined });
+    } finally {
       setCreating(false);
     }
   }
@@ -188,9 +205,28 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    try {
+      // Persist the billing policy for real. Field names follow the API's
+      // snake_case convention — confirm the exact payload shape with the engine
+      // if a field is rejected (api.policy.update is currently untyped).
+      await api.policy.update({
+        upgrade_strategy: upgradeStrategy,
+        downgrade_strategy: downgradeStrategy,
+        dunning_change_policy: dunningChanges,
+        grace_days: Number(graceDays),
+        max_debt_kobo: Number(maxDebt),
+        max_attempts: Number(maxAttempts),
+        payday_day: Number(paydayDay),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success('Billing policy saved');
+    } catch (e) {
+      toast.error("Couldn't save billing policy", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
   }
 
   async function runTick() {

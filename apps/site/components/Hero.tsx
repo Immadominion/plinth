@@ -52,6 +52,9 @@ export default function Hero() {
 
   useLayoutEffect(() => {
     if (new URLSearchParams(window.location.search).has("still")) return; // freeze for capture
+    // respect reduced-motion: skip the intro tween so .intro elements stay at
+    // their natural (visible) state rather than animating in from opacity:0
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
       gsap.from(".intro", {
         y: 24,
@@ -148,7 +151,7 @@ export default function Hero() {
           <div className="intro pointer-events-auto mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row md:mt-9">
             <a
               href="#start"
-              className="group inline-flex items-center gap-2.5 rounded-full bg-jade px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-600"
+              className="group inline-flex items-center gap-2.5 rounded-full bg-jade-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-700"
             >
               Schedule a demo
               <LongArrow className="animate-nudge text-white/90" />

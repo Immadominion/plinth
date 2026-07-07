@@ -58,7 +58,7 @@ export default function Trust() {
           ))}
         </div>
 
-        <p className="mt-8 text-center text-xs text-ink/40">
+        <p className="mt-8 text-center text-xs text-ink/60">
           Security &amp; compliance details (encryption, access controls, certifications) —
           placeholder, to be finalised before launch.
         </p>

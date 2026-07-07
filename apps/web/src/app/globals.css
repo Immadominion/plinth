@@ -60,9 +60,10 @@
     --mid: #71716c;
     --faint: #a3a39e;
 
-    /* jade — the accent */
+    /* jade — the accent. --jade is the vibrant brand hue (dots, large text);
+       --jade-deep is AA-safe for white-text buttons + small jade text (4.7:1). */
     --jade: #0fa37f;
-    --jade-deep: #0c8a6b;
+    --jade-deep: #0b8366;
     --jade-tint: #dff3ec;
     --jade-lite: #3bc0a1;
 
@@ -134,6 +135,14 @@
   ::selection {
     background: var(--jade-tint);
     color: var(--ink);
+  }
+
+  /* Global keyboard focus — WCAG 2.4.7. :where() keeps specificity 0 so
+     components with their own focus-visible ring (e.g. Button) still win. */
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid var(--jade-deep);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 }
 

@@ -312,7 +312,7 @@ function ImmersiveStory() {
           className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-5"
         >
           <div className="mx-auto w-full max-w-5xl">
-            <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-bone/40">
+            <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-bone/55">
               <span className="h-1 w-1 rounded-full bg-jade" />
               The problem
             </span>
@@ -409,7 +409,7 @@ function ImmersiveStory() {
         {/* scroll affordance */}
         <div
           ref={hintRef}
-          className="pointer-events-none absolute bottom-7 left-1/2 z-40 -translate-x-1/2 font-mono text-[11px] uppercase tracking-[0.3em] text-bone/40"
+          className="pointer-events-none absolute bottom-7 left-1/2 z-40 -translate-x-1/2 font-mono text-[11px] uppercase tracking-[0.3em] text-bone/55"
         >
           Scroll to explore
         </div>
@@ -447,7 +447,7 @@ function ImmersiveStory() {
             <button
               type="button"
               onClick={() => apiRef.current?.()}
-              className="pointer-events-auto mt-3 w-full rounded-md bg-jade px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-jade-600"
+              className="pointer-events-auto mt-3 w-full rounded-md bg-jade-600 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-jade-700"
             >
               Log all placements to console
             </button>
