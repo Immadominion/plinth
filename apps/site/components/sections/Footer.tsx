@@ -1,6 +1,14 @@
 import Image from "next/image";
 import { Container } from "./ui";
 import { Reveal } from "./Reveal";
+import { DOCS_URL } from "@/lib/site";
+
+// Known destinations for footer links; anything not listed here is still a
+// placeholder ("#") — pre-launch, no page exists for it yet.
+const LINK_HREFS: Record<string, string> = {
+  Docs: DOCS_URL,
+  "API reference": `${DOCS_URL}/api-reference`,
+};
 
 const columns = [
   { title: "Product", links: ["Subscriptions", "Accounts", "Pricing", "Entitlements API"] },
@@ -51,7 +59,7 @@ export default function Footer() {
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l}>
-                    <a href="#" className="text-sm text-ink/65 transition hover:text-ink">{l}</a>
+                    <a href={LINK_HREFS[l] ?? "#"} className="text-sm text-ink/65 transition hover:text-ink">{l}</a>
                   </li>
                 ))}
               </ul>

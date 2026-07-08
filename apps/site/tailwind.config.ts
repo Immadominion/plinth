@@ -49,11 +49,22 @@ const config: Config = {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(-50%)" },
         },
+        // video modal entrance — backdrop fades, panel fades+settles
+        "modal-backdrop": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "modal-panel": {
+          from: { opacity: "0", transform: "scale(0.96) translateY(6px)" },
+          to: { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
       },
       animation: {
         nudge: "nudge 2.4s ease-in-out infinite",
         floaty: "floaty 9s ease-in-out infinite",
         marquee: "marquee 32s linear infinite",
+        "modal-backdrop": "modal-backdrop 0.2s ease-out",
+        "modal-panel": "modal-panel 0.24s cubic-bezier(0.22,0.72,0.2,1)",
       },
     },
   },
