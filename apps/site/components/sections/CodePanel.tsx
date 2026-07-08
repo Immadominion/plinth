@@ -22,7 +22,7 @@ export function CodePanel({ filename, code }: { filename: string; code: string }
   const lines = code.split("\n");
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink/10 bg-ink-900 shadow-sm">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-ink/10 bg-ink-900 shadow-sm">
       {/* window chrome */}
       <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
         <span className="h-3 w-3 rounded-full bg-white/20" />

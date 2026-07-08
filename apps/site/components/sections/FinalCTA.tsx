@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Container, Section } from "./ui";
 import { Reveal } from "./Reveal";
 import { ArrowRight } from "./icons";
+import { APP_URL, DOCS_URL } from "@/lib/site";
 
 export default function FinalCTA() {
   return (
@@ -53,14 +54,14 @@ export default function FinalCTA() {
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
               <a
-                href="#"
+                href={APP_URL}
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-jade-600 px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-700 sm:w-auto"
               >
                 Start building
                 <ArrowRight className="arrow-slide h-4 w-4" />
               </a>
               <a
-                href="#developers"
+                href={DOCS_URL}
                 className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/5 px-7 py-3 text-sm font-semibold text-bone backdrop-blur transition hover:bg-white/10 sm:w-auto"
               >
                 Read the docs

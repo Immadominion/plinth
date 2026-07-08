@@ -16,7 +16,8 @@ const CSP = [
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "connect-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com",
-  "frame-src 'none'",
+  // the hero's "watch a video" overlay embeds a YouTube (privacy-mode) iframe
+  "frame-src https://www.youtube-nocookie.com",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
