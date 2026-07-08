@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, Thead, Th, Tbody, Tr, Td } from '@/components/ui/table';
-import { TableSkeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { api } from '@/lib/api';
 import { formatKobo, formatDate } from '@/lib/utils';
@@ -93,7 +93,18 @@ export default function CustomersPage() {
             </Thead>
             <Tbody>
               {isLoading ? (
-                <TableSkeleton cols={6} rows={6} />
+                <>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Tr key={i}>
+                      <Td><Skeleton className="h-4 w-28" /></Td>
+                      <Td><Skeleton className="h-3.5 w-40" /></Td>
+                      <Td><Skeleton className="h-3.5 w-20" /></Td>
+                      <Td><Skeleton className="h-3.5 w-24" /></Td>
+                      <Td><Skeleton className="h-4 w-16 ml-auto" /></Td>
+                      <Td><Skeleton className="h-3.5 w-20" /></Td>
+                    </Tr>
+                  ))}
+                </>
               ) : filtered.length === 0 ? (
                 <tr>
                   <Td className="text-center text-faint py-8">

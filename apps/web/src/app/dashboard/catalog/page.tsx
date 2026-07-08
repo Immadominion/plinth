@@ -12,6 +12,7 @@ import { formatKobo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle, Layers, FolderPlus, HelpCircle, Trash2, Archive } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PlanGroup {
   id: string;
@@ -207,9 +208,33 @@ export default function CatalogPage() {
             </div>
 
             {loading && (
-              <div className="space-y-3">
+              <div className="space-y-6">
                 {[0, 1].map((i) => (
-                  <div key={i} className="h-28 rounded-xl bg-soft animate-pulse" />
+                  <div key={i} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-3.5 w-3.5 rounded" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-10" />
+                    </div>
+                    {[0, 1].map((j) => (
+                      <Card key={j} className="p-5">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-28" />
+                            <Skeleton className="h-7 w-32" />
+                          </div>
+                          <div className="flex gap-1.5">
+                            <Skeleton className="h-7 w-12 rounded-lg" />
+                            <Skeleton className="h-7 w-7 rounded-lg" />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Skeleton className="h-5 w-16 rounded-full" />
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}

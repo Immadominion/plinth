@@ -153,7 +153,16 @@ export default function WebhooksPage() {
               {expanded === e.id && (
                 <div className="px-4 pb-4 bg-soft">
                   {!deliveries ? (
-                    <p className="py-4 text-xs text-faint">Loading deliveries…</p>
+                    <div className="py-3 space-y-2">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="flex items-center gap-3 px-3 py-2">
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-3 w-16 ml-auto" />
+                          <Skeleton className="h-5 w-14 rounded-full" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <>
                       <div className="flex items-center gap-2 py-3">

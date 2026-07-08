@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Tabs } from '@/components/ui/tabs';
 import { Table, Thead, Th, Tbody, Tr, Td } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
-import { TableSkeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatKobo, formatDate } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { MoreHorizontal, Plus, Play, FastForward, Copy, Check, CreditCard } from 'lucide-react';
@@ -176,7 +176,18 @@ export default function SubscriptionsPage() {
                 </tr>
               </Thead>
               <Tbody>
-                <TableSkeleton cols={8} rows={6} />
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Tr key={i}>
+                    <Td><Skeleton className="h-4 w-28" /></Td>
+                    <Td><Skeleton className="h-4 w-24" /></Td>
+                    <Td><Skeleton className="h-4 w-16 ml-auto" /></Td>
+                    <Td><Skeleton className="h-5 w-14 rounded-full" /></Td>
+                    <Td><Skeleton className="h-5 w-16 rounded-full" /></Td>
+                    <Td><Skeleton className="h-3.5 w-20" /></Td>
+                    <Td><Skeleton className="h-3.5 w-20" /></Td>
+                    <Td><Skeleton className="h-7 w-7 rounded-lg" /></Td>
+                  </Tr>
+                ))}
               </Tbody>
             </Table>
           ) : filtered.length === 0 ? (

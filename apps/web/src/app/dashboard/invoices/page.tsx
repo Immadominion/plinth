@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { Table, Thead, Th, Tbody, Tr, Td } from '@/components/ui/table';
-import { TableSkeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { formatKobo, formatDate } from '@/lib/utils';
 import { Download } from 'lucide-react';
@@ -116,7 +116,20 @@ export default function InvoicesPage() {
             </Thead>
             <Tbody>
               {isLoading ? (
-                <TableSkeleton cols={8} rows={6} />
+                <>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Tr key={i}>
+                      <Td><Skeleton className="h-3.5 w-24" /></Td>
+                      <Td><Skeleton className="h-4 w-28" /></Td>
+                      <Td><Skeleton className="h-4 w-16 ml-auto" /></Td>
+                      <Td><Skeleton className="h-5 w-14 rounded-full" /></Td>
+                      <Td><Skeleton className="h-3.5 w-32" /></Td>
+                      <Td><Skeleton className="h-5 w-14 rounded-full" /></Td>
+                      <Td><Skeleton className="h-3.5 w-20" /></Td>
+                      <Td><Skeleton className="h-3.5 w-20" /></Td>
+                    </Tr>
+                  ))}
+                </>
               ) : filtered.length === 0 ? (
                 <tr>
                   <Td className="text-center text-faint py-8" colSpan={8}>

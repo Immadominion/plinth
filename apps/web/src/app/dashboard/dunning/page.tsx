@@ -70,7 +70,6 @@ export default function DunningPage() {
   const graceDays: number = policyData?.grace_days ?? 7;
   const now: Date = clockData?.simulated_now ? new Date(clockData.simulated_now) : new Date();
 
-  const [error] = useState<string | null>(null);
   const [reminders, setReminders] = useState<Record<string, ReminderState>>({});
 
   async function sendReminder(customerId: string) {
@@ -147,8 +146,6 @@ export default function DunningPage() {
               </div>
             ))}
           </div>
-        ) : error ? (
-          <div className="py-16 text-center"><p className="text-sm text-danger">{error}</p></div>
         ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
