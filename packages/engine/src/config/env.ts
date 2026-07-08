@@ -13,6 +13,11 @@ const EnvSchema = z.object({
   NOMBA_BASE_URL: z.string().url().default('https://sandbox.nomba.com'),
   NOMBA_WEBHOOK_SECRET: z.string().optional(),
 
+  // Prod mirrors every inbound Nomba webhook here (fire-and-forget) so it can still be observed
+  // from a local dev tunnel without ever re-registering the webhook URL with Nomba. e.g.
+  // https://dev-api.useplinth.xyz/webhooks/nomba
+  DEV_WEBHOOK_FORWARD_URL: z.string().url().optional(),
+
   USE_FAKE_NOMBA: z
     .string()
     .transform((v) => v !== 'false')
