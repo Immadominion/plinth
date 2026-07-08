@@ -2,7 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import gsap from "gsap";
+import { BridgeSceneBoundary, BridgeFallback } from "./BridgeSceneBoundary";
+import { VideoModal } from "./VideoModal";
+import { isWebglAvailable } from "@/lib/webgl";
+import { APP_URL, DOCS_URL } from "@/lib/site";
 
 const BridgeScene = dynamic(() => import("./BridgeScene"), { ssr: false });
 
@@ -45,13 +50,19 @@ function PlayGlyph({ className = "" }: { className?: string }) {
 export default function Hero() {
   const root = useRef<HTMLElement>(null);
   const [reduce, setReduce] = useState(false);
+  const [webglOk, setWebglOk] = useState(true);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   useEffect(() => {
     setReduce(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    setWebglOk(isWebglAvailable());
   }, []);
 
   useLayoutEffect(() => {
     if (new URLSearchParams(window.location.search).has("still")) return; // freeze for capture
+    // respect reduced-motion: skip the intro tween so .intro elements stay at
+    // their natural (visible) state rather than animating in from opacity:0
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
       gsap.from(".intro", {
         y: 24,
@@ -77,16 +88,30 @@ export default function Hero() {
         }}
       />
 
-      {/* live 3D bridge + danfo + the PLINTH backdrop word behind the pylon */}
+      {/* live 3D bridge + danfo + the PLINTH backdrop word behind the pylon —
+          falls back to a static photo if WebGL is unavailable or the scene
+          throws (unsupported GPU, driver crash, lost context). */}
       <div className="absolute inset-0 z-0">
-        <BridgeScene reduce={reduce} />
+        {webglOk ? (
+          <BridgeSceneBoundary>
+            <BridgeScene reduce={reduce} />
+          </BridgeSceneBoundary>
+        ) : (
+          <BridgeFallback />
+        )}
       </div>
 
       {/* ── nav ── plain links, no capsule; wordmark in the poster face ── */}
       <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-5 pt-6">
         <a href="#" className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/plinth-logo.png" alt="Plinth" className="h-9 w-9 object-contain" />
+          <Image
+            src="/plinth-logo.png"
+            alt="Plinth"
+            width={36}
+            height={36}
+            priority
+            className="h-9 w-9 object-contain"
+          />
           <span className="font-display text-2xl font-bold leading-none tracking-tight text-ink">
             Plinth
           </span>
@@ -96,7 +121,7 @@ export default function Hero() {
           {[
             { l: "Subscriptions", href: "#subscriptions" },
             { l: "Accounts", href: "#accounts" },
-            { l: "Docs", href: "#developers" },
+            { l: "Docs", href: DOCS_URL },
             { l: "Pricing", href: "#pricing" },
           ].map(({ l, href }) => (
             <a key={l} href={href} className="transition-colors hover:text-ink">
@@ -106,7 +131,7 @@ export default function Hero() {
         </nav>
 
         <a
-          href="#start"
+          href={APP_URL}
           className="group inline-flex items-center gap-2.5 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bone shadow-sm transition hover:bg-ink-700"
         >
           Start building
@@ -148,23 +173,24 @@ export default function Hero() {
           <div className="intro pointer-events-auto mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row md:mt-9">
             <a
               href="#start"
-              className="group inline-flex items-center gap-2.5 rounded-full bg-jade px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-600"
+              className="group inline-flex items-center gap-2.5 rounded-full bg-jade-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-jade-700"
             >
               Schedule a demo
               <LongArrow className="animate-nudge text-white/90" />
             </a>
-            <a
-              href={VIDEO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setVideoOpen(true)}
               className="group inline-flex items-center gap-2.5 rounded-full border border-ink/10 bg-white/70 px-6 py-3.5 text-sm font-semibold text-ink backdrop-blur transition hover:bg-white"
             >
               <PlayGlyph className="transition-transform group-hover:scale-105" />
               Watch a video
-            </a>
+            </button>
           </div>
         </div>
       </div>
+
+      <VideoModal url={VIDEO_URL} open={videoOpen} onClose={() => setVideoOpen(false)} />
     </section>
   );
 }

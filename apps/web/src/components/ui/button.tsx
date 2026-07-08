@@ -6,8 +6,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  // jade = the accent; actions are the only place it gets to be loud
-  default: 'bg-jade text-white hover:bg-jade-deep shadow-[0_1px_2px_rgba(10,10,10,0.12)]',
+  // jade = the accent; actions are the only place it gets to be loud.
+  // jade-deep is AA-safe (4.7:1) for white text; darkens slightly on hover.
+  default: 'bg-jade-deep text-white hover:brightness-95 shadow-[0_1px_2px_rgba(10,10,10,0.12)]',
   outline: 'border border-line bg-card text-body hover:border-faint hover:text-ink',
   ghost: 'text-mid hover:bg-soft hover:text-ink',
   destructive: 'bg-danger-bar text-white hover:brightness-95',

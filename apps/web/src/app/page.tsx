@@ -20,7 +20,7 @@ export default function LandingPage() {
             <span className="font-semibold text-sm">Plinth</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/docs" className="text-sm text-slate-400 hover:text-white transition-colors">Docs</Link>
+            <a href="https://docs.useplinth.xyz" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-white transition-colors">Docs</a>
             <Link href="/login" className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors font-medium">
               Sign in
             </Link>
@@ -45,12 +45,14 @@ export default function LandingPage() {
 
         <div className="flex items-center justify-center gap-4">
           <DemoButton />
-          <Link
-            href="/docs"
+          <a
+            href="https://docs.useplinth.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 px-6 py-3 rounded-xl font-medium transition-colors text-sm"
           >
             Read Docs →
-          </Link>
+          </a>
         </div>
       </section>
 

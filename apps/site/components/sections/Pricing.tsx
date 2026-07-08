@@ -1,6 +1,7 @@
 import { Container, Section, SectionHeading, PrimaryButton, SecondaryButton } from "./ui";
 import { Reveal } from "./Reveal";
 import { CheckIcon } from "./icons";
+import { APP_URL } from "@/lib/site";
 
 /* Pricing structure templated; actual amounts are finalised at launch
    (usage-based infra pricing — no fabricated numbers shipped). */
@@ -11,6 +12,7 @@ const tiers = [
     note: "Build and test end-to-end",
     features: ["Full API & SDK access", "Test mode", "Webhooks", "Community support"],
     cta: "Start building",
+    href: APP_URL,
     highlight: false,
   },
   {
@@ -25,6 +27,7 @@ const tiers = [
       "Email support",
     ],
     cta: "Start building",
+    href: APP_URL,
     highlight: true,
   },
   {
@@ -33,6 +36,7 @@ const tiers = [
     note: "Volume, controls & SLAs",
     features: ["Everything in Growth", "Volume pricing", "Dedicated support & SLA", "Custom policy & onboarding"],
     cta: "Talk to sales",
+    href: "mailto:support@nomba.com",
     highlight: false,
   },
 ];
@@ -78,7 +82,7 @@ export default function Pricing() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-display text-lg font-semibold text-ink">{t.name}</h3>
                     {t.highlight ? (
-                      <span className="rounded-full bg-jade px-2.5 py-1 text-[11px] font-semibold text-white">
+                      <span className="rounded-full bg-jade-600 px-2.5 py-1 text-[11px] font-semibold text-white">
                         Most popular
                       </span>
                     ) : null}
@@ -103,11 +107,11 @@ export default function Pricing() {
 
                   <div className="mt-8">
                     {t.highlight ? (
-                      <PrimaryButton href="#" className="w-full">
+                      <PrimaryButton href={t.href} className="w-full">
                         {t.cta}
                       </PrimaryButton>
                     ) : (
-                      <SecondaryButton href="#" className="w-full">
+                      <SecondaryButton href={t.href} className="w-full">
                         {t.cta}
                       </SecondaryButton>
                     )}

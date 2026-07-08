@@ -1,5 +1,14 @@
+import Image from "next/image";
 import { Container } from "./ui";
 import { Reveal } from "./Reveal";
+import { DOCS_URL } from "@/lib/site";
+
+// Known destinations for footer links; anything not listed here is still a
+// placeholder ("#") — pre-launch, no page exists for it yet.
+const LINK_HREFS: Record<string, string> = {
+  Docs: DOCS_URL,
+  "API reference": `${DOCS_URL}/api-reference`,
+};
 
 const columns = [
   { title: "Product", links: ["Subscriptions", "Accounts", "Pricing", "Entitlements API"] },
@@ -24,8 +33,7 @@ export default function Footer() {
         <Reveal className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-2 md:gap-10 lg:grid-cols-12">
           <div className="col-span-2 md:col-span-1 lg:col-span-4">
             <a href="#" className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/plinth-logo.png" alt="Plinth" className="h-8 w-8 object-contain" />
+              <Image src="/plinth-logo.png" alt="Plinth" width={32} height={32} className="h-8 w-8 object-contain" />
               <span className="font-display text-lg font-semibold tracking-tightest text-ink">Plinth</span>
             </a>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink/60">
@@ -47,11 +55,11 @@ export default function Footer() {
 
           {columns.map((col) => (
             <div key={col.title} className="lg:col-span-2">
-              <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/40">{col.title}</h3>
+              <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/60">{col.title}</h3>
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l}>
-                    <a href="#" className="text-sm text-ink/65 transition hover:text-ink">{l}</a>
+                    <a href={LINK_HREFS[l] ?? "#"} className="text-sm text-ink/65 transition hover:text-ink">{l}</a>
                   </li>
                 ))}
               </ul>
@@ -61,7 +69,7 @@ export default function Footer() {
 
         {/* ── offices ── */}
         <Reveal delay={80} className="mt-14 border-t border-ink/10 pt-8">
-          <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/40">Offices</h3>
+          <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-ink/60">Offices</h3>
           <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
             {offices.map((o, i) => (
               <div key={`${o.country}-${i}`} className="text-sm leading-relaxed text-ink/60">
@@ -77,7 +85,7 @@ export default function Footer() {
           </div>
         </Reveal>
 
-        <p className="mt-10 text-xs text-ink/45">
+        <p className="mt-10 text-xs text-ink/60">
           Naira (NGN). Amounts shown human-readable; the API uses kobo.
         </p>
       </Container>

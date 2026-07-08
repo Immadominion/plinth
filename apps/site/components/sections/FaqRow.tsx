@@ -13,13 +13,13 @@ export function FaqRow({ q, a }: { q: string; a: string }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 py-5 text-left font-display text-base font-semibold text-ink transition-colors hover:text-jade"
+        className="flex w-full items-center justify-between gap-4 py-5 text-left font-display text-base font-semibold text-ink transition-colors hover:text-jade-600"
       >
         <span>{q}</span>
         <span
           aria-hidden
           className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-lg leading-none transition-all duration-300 ${
-            open ? "rotate-45 border-jade/40 bg-jade/10 text-jade" : "border-ink/15 text-ink/50"
+            open ? "rotate-45 border-jade/40 bg-jade/10 text-jade-600" : "border-ink/15 text-ink/60"
           }`}
         >
           +

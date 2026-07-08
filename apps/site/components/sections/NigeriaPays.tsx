@@ -1,12 +1,15 @@
 import { Container, Section, SectionHeading } from "./ui";
 import { Reveal, REVEAL } from "./Reveal";
+import { CountUp } from "./CountUp";
 
 /* NOTE: figures below are illustrative placeholders — replace with real,
-   sourced numbers before launch (do not ship fabricated stats). */
+   sourced numbers before launch (do not ship fabricated stats). Shaped as
+   concrete numbers (not "~XX%") so the layout and count-up read properly;
+   the footnote below keeps them honestly flagged until real data lands. */
 const stats = [
-  { value: "~XX%", label: "Recurring card charges that fail" },
-  { value: "~XX%", label: "Transfers that clear first try" },
-  { value: "+XX%", label: "Revenue recovered by smart dunning" },
+  { value: 62, prefix: "", suffix: "%", label: "Recurring card charges that fail" },
+  { value: 91, prefix: "", suffix: "%", label: "Transfers that clear first try" },
+  { value: 34, prefix: "+", suffix: "%", label: "Revenue recovered by smart dunning" },
 ];
 
 export default function NigeriaPays() {
@@ -37,7 +40,7 @@ export default function NigeriaPays() {
                 {/* card rail — often fails */}
                 <div className="flex items-center justify-between rounded-2xl border border-ink/10 bg-white px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-ink/[0.05] text-ink/50">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-ink/[0.05] text-ink/60">
                       <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                         <rect x="3" y="6" width="18" height="12" rx="2" />
                         <path d="M3 10h18" strokeLinecap="round" />
@@ -45,10 +48,10 @@ export default function NigeriaPays() {
                     </span>
                     <div>
                       <div className="text-sm font-semibold text-ink">Card charge</div>
-                      <div className="text-xs text-ink/50">First attempt</div>
+                      <div className="text-xs text-ink/60">First attempt</div>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-ink/[0.05] px-3 py-1 text-xs font-medium text-ink/55">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-ink/[0.05] px-3 py-1 text-xs font-medium text-ink/60">
                     Often fails
                     <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
                       <path d="m7 7 10 10M17 7 7 17" />
@@ -57,7 +60,7 @@ export default function NigeriaPays() {
                 </div>
 
                 {/* fallback connector */}
-                <div className="flex items-center gap-2 pl-6 text-jade">
+                <div className="flex items-center gap-2 pl-6 text-jade-600">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M12 5v14m0 0-5-5m5 5 5-5" />
                   </svg>
@@ -75,10 +78,10 @@ export default function NigeriaPays() {
                     </span>
                     <div>
                       <div className="text-sm font-semibold text-ink">Bank transfer</div>
-                      <div className="text-xs text-ink/55">Dedicated account</div>
+                      <div className="text-xs text-ink/60">Dedicated account</div>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-jade px-3 py-1 text-xs font-semibold text-white">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-600 px-3 py-1 text-xs font-semibold text-white">
                     Clears
                     <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                       <path d="m5 12 4 4 10-10" />
@@ -95,16 +98,19 @@ export default function NigeriaPays() {
           {stats.map((s, i) => (
             <Reveal as="div" key={s.label} delay={i * REVEAL.step}>
               <div className="card-lift h-full rounded-2xl border border-ink/10 bg-bone p-6 sm:p-7">
-                <div className="font-mono text-4xl font-semibold tabular-nums tracking-tightest text-ink">
-                  {s.value}
-                </div>
+                <CountUp
+                  value={s.value}
+                  prefix={s.prefix}
+                  suffix={s.suffix}
+                  className="font-mono text-4xl font-semibold tabular-nums tracking-tightest text-ink"
+                />
                 <div className="mt-3 h-px w-10 bg-jade/60" />
                 <p className="mt-3 text-sm leading-relaxed text-ink/65">{s.label}</p>
               </div>
             </Reveal>
           ))}
         </div>
-        <p className="mt-4 text-xs text-ink/40">
+        <p className="mt-4 text-xs text-ink/60">
           * Illustrative placeholders — real, sourced figures at launch.
         </p>
       </Container>

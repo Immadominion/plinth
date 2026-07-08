@@ -2,6 +2,7 @@ import { Container, Section, SectionHeading, PrimaryButton, SecondaryButton } fr
 import { Reveal } from "./Reveal";
 import { CodePanel } from "./CodePanel";
 import { CheckIcon } from "./icons";
+import { DOCS_URL } from "@/lib/site";
 
 const snippet = `import { Plinth } from "@plinth/sdk";
 const plinth = new Plinth(process.env.PLINTH_API_KEY);
@@ -52,15 +53,17 @@ export default function Developers() {
                 ))}
               </ul>
               <div className="mt-8 flex flex-wrap gap-3">
-                <PrimaryButton href="#" className="group">
+                <PrimaryButton href={DOCS_URL} className="group">
                   Read the docs
                 </PrimaryButton>
-                <SecondaryButton href="#">View API reference</SecondaryButton>
+                <SecondaryButton href={`${DOCS_URL}/api-reference`}>
+                  View API reference
+                </SecondaryButton>
               </div>
             </div>
           </Reveal>
 
-          <Reveal delay={140}>
+          <Reveal delay={140} className="min-w-0">
             <CodePanel filename="subscribe.ts" code={snippet} />
           </Reveal>
         </div>

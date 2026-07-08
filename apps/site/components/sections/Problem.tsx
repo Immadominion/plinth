@@ -54,7 +54,7 @@ export default function Problem() {
   return (
     <Section id="problem" className="flex min-h-[100svh] items-center bg-ink">
       <Container>
-        <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-bone/40">
+        <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-bone/55">
           <span className="h-1 w-1 rounded-full bg-jade" />
           The problem
         </span>

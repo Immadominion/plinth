@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { CheckIcon } from "./icons";
 
 /* ──────────────────────────────────────────────────────────────
@@ -11,7 +11,8 @@ import { CheckIcon } from "./icons";
 
    On scroll-in it plays a short beat: rows rise, the coverage bar
    fills, then the status chip "resolves" — the feel of money being
-   reconciled. Respects prefers-reduced-motion (renders settled).
+   reconciled. Respects prefers-reduced-motion (renders settled, no
+   tilt).
    ────────────────────────────────────────────────────────────── */
 
 type Kind = "exact" | "partial" | "over" | "unknown";
@@ -32,10 +33,20 @@ const ROWS: Row[] = [
 ];
 
 const chipClass: Record<Kind, string> = {
-  exact: "bg-jade text-white",
+  exact: "bg-gradient-to-b from-jade to-jade-600 text-white",
   over: "bg-jade/12 text-jade-600 ring-1 ring-jade/25",
   partial: "bg-ink/[0.05] text-ink/60",
-  unknown: "border border-dashed border-ink/25 text-ink/45",
+  unknown: "border border-dashed border-ink/25 text-ink/60",
+};
+
+// per-row elevation, kept within brand.md's ≤8%-opacity shadow rule — a
+// touch of jade-tinted lift for the money-positive rows, flat for the
+// unresolved one, so elevation itself is a quiet status signal
+const rowShadow: Record<Kind, string> = {
+  exact: "shadow-[0_10px_20px_-16px_rgba(15,163,127,0.08)]",
+  over: "shadow-[0_10px_20px_-16px_rgba(15,163,127,0.08)]",
+  partial: "shadow-[0_8px_16px_-14px_rgba(20,24,28,0.08)]",
+  unknown: "",
 };
 
 function ChipIcon({ kind }: { kind: Kind }) {
@@ -58,11 +69,11 @@ function ChipIcon({ kind }: { kind: Kind }) {
 
 export function ReconcileVisual({ className = "" }: { className?: string }) {
   // reduced-motion users start "played" (settled) so there's no flash / motion
-  const [played, setPlayed] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  const motion = !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [played, setPlayed] = useState(() => reducedMotion);
+  const motion = !reducedMotion;
   const ref = useRef<HTMLDivElement | null>(null);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
 
   useEffect(() => {
     if (played) return;
@@ -81,11 +92,31 @@ export function ReconcileVisual({ className = "" }: { className?: string }) {
     return () => io.disconnect();
   }, [played]);
 
+  const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!motion) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    setTilt({ rx: -(py - 0.5) * 3, ry: (px - 0.5) * 3 });
+  };
+  const onMouseLeave = () => setTilt({ rx: 0, ry: 0 });
+
   return (
-    <div
-      ref={ref}
-      className={`rounded-3xl border border-ink/10 bg-bone p-5 shadow-sm sm:p-6 ${className}`}
-    >
+    <div className={`relative ${className}`}>
+      {/* a second card peeking out behind, faint jade tint — the depth cue,
+          kept subtle (brand.md caps shadows/tints at ~8% opacity) */}
+      <div aria-hidden className="absolute inset-2 -z-10 rotate-1 rounded-3xl bg-jade/[0.06]" />
+
+      <div
+        ref={ref}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+        className="rounded-3xl border border-ink/10 bg-bone p-5 shadow-[0_20px_40px_-32px_rgba(20,24,28,0.16)] sm:p-6"
+        style={{
+          transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
+          transition: "transform 400ms cubic-bezier(0.22,0.72,0.2,1)",
+        }}
+      >
       {/* header */}
       <div className="flex items-center justify-between">
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-mid">
@@ -105,7 +136,7 @@ export function ReconcileVisual({ className = "" }: { className?: string }) {
         {ROWS.map((r, i) => (
           <div
             key={r.amount + r.meta}
-            className="rounded-xl border border-ink/10 bg-white px-4 py-3"
+            className={`rounded-xl border border-ink/10 bg-white px-4 py-3 ${rowShadow[r.kind]}`}
             style={{
               opacity: played ? 1 : 0,
               transform: played ? "none" : "translateY(12px)",
@@ -130,7 +161,7 @@ export function ReconcileVisual({ className = "" }: { className?: string }) {
                 {r.chip}
               </span>
             </div>
-            <div className="mt-1.5 font-mono text-[11px] text-ink/45">{r.meta}</div>
+            <div className="mt-1.5 font-mono text-[11px] text-ink/60">{r.meta}</div>
             {/* invoice coverage bar */}
             <div
               className={`mt-2.5 h-1.5 w-full overflow-hidden rounded-full ${
@@ -138,7 +169,7 @@ export function ReconcileVisual({ className = "" }: { className?: string }) {
               }`}
             >
               <div
-                className="h-full rounded-full bg-jade"
+                className="h-full rounded-full bg-gradient-to-r from-jade-400 to-jade"
                 style={{
                   width: played ? `${r.fill * 100}%` : "0%",
                   transition: motion ? `width 700ms cubic-bezier(0.22,0.72,0.2,1) ${i * 120 + 240}ms` : "none",
@@ -151,11 +182,12 @@ export function ReconcileVisual({ className = "" }: { className?: string }) {
 
       {/* footer — every kobo accounted for */}
       <div className="mt-4 flex items-center justify-between border-t border-ink/10 pt-4">
-        <span className="font-mono text-[11px] text-ink/50">4 transfers · ₦21,100 in</span>
+        <span className="font-mono text-[11px] text-ink/60">4 transfers · ₦21,100 in</span>
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-jade-600">
           <CheckIcon className="h-3.5 w-3.5" />
           Every kobo accounted for
         </span>
+      </div>
       </div>
     </div>
   );

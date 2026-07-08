@@ -75,13 +75,15 @@ Serve behind a reverse proxy / set the platform's port as needed. Node 20+ runti
 
 ## Assets
 
-All runtime assets are bundled in [`public/`](./public) (~32 MB total) and ship with the app — **no external asset host is configured yet**:
+All runtime assets are bundled in [`public/`](./public) (~17 MB total) and ship with the app — **no external asset host is configured yet**:
 
 - `public/models/` — `.glb` cultural-artifact models (Benin/Ife bronzes, Nok terracottas) for the billing-engine scene
-- `public/bridge.glb`, `public/danfo-3d.glb` — hero scene
+- `public/danfo-3d.glb` — the bus in the hero scene (the bridge itself is procedural R3F geometry, no GLB)
 - `public/animations/` — `.lottie` + `.riv` card animations
 - `public/logos/` — customer brand logos for the banner
 - `public/cursor.riv` — the custom cursor
+
+Superseded GLB/PNG iterations from earlier hero-scene passes live in [`/_archive/site-legacy-3d-assets`](../../_archive/site-legacy-3d-assets) at the repo root — kept for reference, excluded from the build.
 
 If/when the asset set grows, these can be moved to a CDN/object store and referenced by URL — but that isn't needed to host today.
 

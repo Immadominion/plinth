@@ -94,7 +94,7 @@ export function PrimaryButton({
   return (
     <a
       href={href}
-      className={`inline-flex items-center justify-center rounded-full bg-jade px-6 py-3 text-sm font-semibold text-white transition hover:bg-jade-600 ${className}`}
+      className={`inline-flex items-center justify-center rounded-full bg-jade-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-jade-700 ${className}`}
     >
       {children}
     </a>
@@ -131,7 +131,7 @@ export function Placeholder({
 }) {
   return (
     <div
-      className={`flex items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/[0.02] text-xs font-medium uppercase tracking-wide text-ink/40 ${className}`}
+      className={`flex items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/[0.02] text-xs font-medium uppercase tracking-wide text-ink/60 ${className}`}
       aria-label={`Placeholder: ${label}`}
     >
       {label}
