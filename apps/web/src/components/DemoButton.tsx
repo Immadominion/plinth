@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 
 export function DemoButton() {
@@ -14,6 +13,7 @@ export function DemoButton() {
       const res = await api.auth.demo();
       localStorage.setItem('nomba_api_key', res.api_key);
       localStorage.setItem('nomba_tenant_id', res.tenant_id);
+      localStorage.removeItem('plinth_tour_dashboard_v1_done');
       window.location.href = '/dashboard';
     } catch {
       setError('Demo unavailable right now.');
@@ -28,7 +28,9 @@ export function DemoButton() {
         disabled={loading}
         className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-medium transition-colors text-sm"
       >
-        {loading ? <Loader2 size={15} className="animate-spin" /> : null}
+        {loading && (
+          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+        )}
         {loading ? 'Loading demo…' : 'Try Demo →'}
       </button>
       {error && <p className="text-xs text-red-400">{error}</p>}

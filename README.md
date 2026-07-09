@@ -11,9 +11,23 @@ consumer, not part of Plinth.)
 **▶ Demo video:** https://youtu.be/u3Z_KNJPMBg — the full lifecycle end to end (subscribe → failed
 renewal → automated dunning → recovery by bank transfer), across the customer app and the billing dashboard.
 
-> **Reviewing the dashboard?** Login is passwordless (magic link tied to a business email), so it isn't
-> open to anonymous sign-in. To click through the full UI with sample data and no backend, run it in
-> **mock mode** (`NEXT_PUBLIC_USE_MOCKS=true`) — see [Dashboard mock mode](#dashboard-mock-mode-no-backend-needed) below.
+> **Judges & reviewers — two ways in:**
+>
+> **Option 1 — Live demo (recommended, no setup):**
+> 1. Open **[app.useplinth.xyz](https://app.useplinth.xyz)** in your browser.
+> 2. Click the **"Try Demo"** button on the landing page.
+> 3. You're dropped straight into a pre-seeded tenant dashboard (8 customers, all subscription
+>    states, invoices, dunning board, webhooks). A guided spotlight tour starts automatically and
+>    walks you through every key section — no account or credentials needed.
+>
+> **Option 2 — Local mock mode (no backend, no internet needed):**
+> ```bash
+> cd apps/web
+> cp .env.local.example .env.local   # sets NEXT_PUBLIC_USE_MOCKS=true
+> pnpm dev -- -p 3002
+> ```
+> Then open `http://localhost:3002` in your browser. Every screen is populated with fixture data —
+> no Postgres, no engine, no credentials required.
 
 ---
 

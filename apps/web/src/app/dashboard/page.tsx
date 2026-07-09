@@ -277,7 +277,7 @@ export default function DashboardPage() {
 
           {/* Row 2 — stat band */}
           <Rise>
-            <Card className="grid grid-cols-2 divide-x divide-y divide-line lg:grid-cols-4 lg:divide-y-0">
+            <Card data-tour="stat-band" className="grid grid-cols-2 divide-x divide-y divide-line lg:grid-cols-4 lg:divide-y-0">
               <BandStat
                 label="Active"
                 value={snap.counts['active'] ?? 0}
