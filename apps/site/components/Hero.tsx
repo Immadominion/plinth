@@ -11,7 +11,7 @@ import { APP_URL, DOCS_URL } from "@/lib/site";
 
 const BridgeScene = dynamic(() => import("./BridgeScene"), { ssr: false });
 
-const VIDEO_URL = "https://youtu.be/u3Z_KNJPMBg";
+const VIDEO_URL = "https://youtu.be/30QIrW4ATC0";
 
 /* a slim long arrow that nudges forward (paired with `animate-nudge`) */
 function LongArrow({ className = "" }: { className?: string }) {

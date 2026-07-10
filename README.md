@@ -8,7 +8,7 @@ Plinth is tenant-agnostic: each business is a **tenant** that onboards, gets API
 its plans and billing policy, and bills its own customers. (The `nollybox` app is a demo
 consumer, not part of Plinth.)
 
-[![Watch the demo — subscribe → failed renewal → dunning → recovery](https://img.youtube.com/vi/u3Z_KNJPMBg/maxresdefault.jpg)](https://youtu.be/u3Z_KNJPMBg)
+[![Watch the demo — subscribe → failed renewal → dunning → recovery](https://img.youtube.com/vi/30QIrW4ATC0/maxresdefault.jpg)](https://youtu.be/30QIrW4ATC0)
 
 ![Plinth architecture](docs/architecture.png)
 
