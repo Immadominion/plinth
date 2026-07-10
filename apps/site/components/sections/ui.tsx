@@ -21,6 +21,8 @@ export function Section({
   className = "",
   children,
   full = false,
+  stage = false,
+  pin = false,
 }: {
   id?: string;
   className?: string;
@@ -28,7 +30,39 @@ export function Section({
   /** fill the viewport (min 100svh) with content vertically centred — desktop
       up; on mobile it falls back to natural height so phones don't over-scroll */
   full?: boolean;
+  /** Staged panel: on desktop+motion the section becomes a 200vh box whose inner
+      panel pins (sticky) and is pulled up over the previous section (-mt-[100vh]),
+      so ScrollTransitions can transition it in as a solid full-viewport panel
+      that covers its neighbour — the "genuine page-transition" model, rather
+      than transforming content in place against a matching background. The
+      transform lands on the [data-tx-target] inner so it can't break the pin.
+      Mobile / reduced-motion: natural stacked flow. */
+  stage?: boolean;
+  /** Pinned panel: like `stage` but WITHOUT the pull-up — it enters the
+      viewport in normal flow (so an in-flow effect like fade/from-bottom can
+      bring it in), then pins for 100vh so the NEXT staged section has a held
+      surface to cover. Use when a section is covered by its successor but
+      should not itself cover its predecessor. */
+  pin?: boolean;
 }) {
+  if (stage || pin) {
+    return (
+      <section
+        id={id}
+        {...(stage ? { "data-stage": "" } : { "data-pin": "" })}
+        className={`relative scroll-mt-24 motion-safe:md:h-[200vh] ${
+          stage ? "motion-safe:md:-mt-[100vh]" : ""
+        }`}
+      >
+        <div
+          data-tx-target
+          className={`flex min-h-[100svh] flex-col justify-center py-16 md:py-20 motion-safe:md:sticky motion-safe:md:top-0 motion-safe:md:h-screen motion-safe:md:min-h-0 motion-safe:md:overflow-hidden ${className}`}
+        >
+          {children}
+        </div>
+      </section>
+    );
+  }
   return (
     <section
       id={id}

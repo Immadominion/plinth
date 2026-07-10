@@ -30,7 +30,7 @@ const pillars: Pillar[] = [
 
 export default function Trust() {
   return (
-    <Section id="trust" full className="bg-bone">
+    <Section id="trust" stage className="bg-bone">
       <Container>
         <Reveal>
           <SectionHeading
