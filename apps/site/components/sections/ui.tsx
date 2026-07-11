@@ -56,7 +56,7 @@ export function Section({
       >
         <div
           data-tx-target
-          className={`flex min-h-[100svh] flex-col justify-center py-16 md:py-20 motion-safe:md:sticky motion-safe:md:top-0 motion-safe:md:h-screen motion-safe:md:min-h-0 motion-safe:md:overflow-hidden ${className}`}
+          className={`flex min-h-[100svh] flex-col justify-center py-8 md:py-10 motion-safe:md:sticky motion-safe:md:top-0 motion-safe:md:h-screen motion-safe:md:min-h-0 motion-safe:md:overflow-hidden ${className}`}
         >
           {children}
         </div>

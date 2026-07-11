@@ -1,7 +1,7 @@
 import { Container, Section, SectionHeading } from "./ui";
 import { Reveal, REVEAL } from "./Reveal";
 import { CountUp } from "./CountUp";
-import { LottieBg } from "./CardMedia";
+import { LottieOnce } from "./BentoMedia";
 
 const stats = [
   { value: 62, prefix: "", suffix: "%", label: "Recurring card charges that fail" },
@@ -13,8 +13,8 @@ export default function NigeriaPays() {
   return (
     <Section id="nigeria" pin className="bg-white">
       <Container>
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <Reveal>
+        <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-16">
+          <Reveal className="lg:order-first">
             <SectionHeading
               eyebrow="The differentiator"
               title={
@@ -28,14 +28,14 @@ export default function NigeriaPays() {
 
           {/* card → transfer fallback, told as a motion illustration */}
           <Reveal delay={120}>
-            <div className="mx-auto aspect-square w-full max-w-md">
-              <LottieBg src="/animations/bank-card-animation.lottie" />
+            <div className="mx-auto aspect-square w-full max-w-[300px] lg:ml-auto lg:mr-0">
+              <LottieOnce src="/animations/bank-card-animation.lottie" />
             </div>
           </Reveal>
         </div>
 
         {/* the numbers: no container, just big confident figures */}
-        <div className="mt-14 grid gap-8 sm:mt-16 sm:grid-cols-3 sm:gap-10">
+        <div className="mt-8 grid gap-8 sm:mt-10 sm:grid-cols-3 sm:gap-10">
           {stats.map((s, i) => (
             <Reveal as="div" key={s.label} delay={i * REVEAL.step}>
               <CountUp
