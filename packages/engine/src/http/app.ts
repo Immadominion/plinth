@@ -53,7 +53,7 @@ export function buildApp(container: Container): Hono {
     });
   }
 
-  app.get('/health', (c) => c.json({ status: 'ok', service: 'plinth' }));
+  app.get('/health', (c) => c.body(null, 200));
 
   app.route('/sandbox', makeSandboxRouter(container.sandboxService));
   app.route('/v1/auth', makeAuthRouter(container.authService));
